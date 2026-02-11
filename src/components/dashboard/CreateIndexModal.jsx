@@ -1,7 +1,7 @@
-'use client';
-
+import { useRouter } from 'next/navigation';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Film, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Upload, Film, Trash2, AlertCircle, Loader2, Check } from 'lucide-react';
+import { upload } from '@vercel/blob/client';
 
 const MIN_DURATION = 4;        // seconds
 const MAX_DURATION = 3600;     // 1 hour
@@ -47,6 +47,8 @@ function getVideoDuration(file) {
 }
 
 export default function CreateIndexModal({ open, onClose }) {
+    const router = useRouter();
+
     // ─── Form state ───
     const [indexName, setIndexName] = useState('');
     const [indexDesc, setIndexDesc] = useState('');
@@ -57,33 +59,21 @@ export default function CreateIndexModal({ open, onClose }) {
     const [creating, setCreating] = useState(false);
     const [progress, setProgress] = useState(0);        // 0-100
     const [statusIdx, setStatusIdx] = useState(0);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [completed, setCompleted] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
 
     const fileInputRef = useRef(null);
     const idCounter = useRef(0);
 
-    // ─── Cycle status text while creating ───
+    // ─── Cycle status text while creating (fallback when no server message) ───
     useEffect(() => {
-        if (!creating) return;
+        if (!creating || isComplete) return;
         const interval = setInterval(() => {
             setStatusIdx((i) => (i + 1) % STATUS_MESSAGES.length);
         }, 3000);
         return () => clearInterval(interval);
-    }, [creating]);
-
-    // ─── Fake progress bar while creating ───
-    useEffect(() => {
-        if (!creating) return;
-        const totalMs = videos.length * 60_000; // ~1 min per video (simulated fast)
-        const tick = 200;
-        const increment = (tick / totalMs) * 100;
-        const interval = setInterval(() => {
-            setProgress((p) => {
-                if (p + increment >= 99) return 99; // stay at 99 until "done"
-                return p + increment;
-            });
-        }, tick);
-        return () => clearInterval(interval);
-    }, [creating, videos.length]);
+    }, [creating, isComplete]);
 
     // ─── Process dropped / selected files ───
     const processFiles = useCallback(async (fileList) => {
@@ -159,19 +149,117 @@ export default function CreateIndexModal({ open, onClose }) {
         });
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
+        if (isComplete) {
+            router.push(`/${indexName}`);
+            return;
+        }
+
         setCreating(true);
+        setIsComplete(false);
         setProgress(0);
         setStatusIdx(0);
-        // In the future, call backend API here.
+        setStatusMessage('');
+        setCompleted(0);
+
+        try {
+            // ── Phase 1: Upload videos to Vercel Blob ──
+            const videoURLs = [];
+            const totalVideos = videos.length;
+
+            for (let i = 0; i < totalVideos; i++) {
+                const v = videos[i];
+                setStatusMessage(`Uploading "${v.name}" to cloud storage (${i + 1}/${totalVideos})…`);
+                setProgress(Math.round(((i) / totalVideos) * 40)); // phase 1 = 0-40%
+
+                try {
+                    const blob = await upload(v.name, v.file, {
+                        access: 'public',
+                        handleUploadUrl: '/api/upload',
+                    });
+
+                    videoURLs.push(blob.url);
+                    console.log(`Uploaded ${v.name} → ${blob.url}`);
+                } catch (uploadErr) {
+                    setErrors((prev) => [...prev, `Failed to upload "${v.name}": ${uploadErr.message}`]);
+                }
+            }
+
+            if (videoURLs.length === 0) {
+                throw new Error('No videos were successfully uploaded to cloud storage.');
+            }
+
+            setProgress(40);
+            setStatusMessage(`All files uploaded. Starting TwelveLabs processing…`);
+
+            // ── Phase 2: Send URLs to /api/videos for TwelveLabs processing ──
+            const metadata = { indexName: indexName, description: indexDesc };
+
+            const res = await fetch('/api/videos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoURLs, metadata }),
+            });
+
+            if (!res.ok) {
+                throw new Error(`Video processing failed: ${res.status}`);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                let currentEvent = '';
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        currentEvent = line.slice(7).trim();
+                    } else if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            // Map server percent (0-100) to phase 2 range (40-100)
+                            if (data.percent !== undefined) {
+                                setProgress(40 + Math.round((data.percent / 100) * 60));
+                            }
+                            if (data.message) setStatusMessage(data.message);
+                            if (data.completed !== undefined) setCompleted(data.completed);
+
+                            if (currentEvent === 'complete') {
+                                setProgress(100);
+                                setStatusMessage('All videos processed successfully!');
+                                setIsComplete(true);
+                            }
+
+                            if (currentEvent === 'video_error' && data.error) {
+                                setErrors((prev) => [...prev, `Video ${data.index + 1}: ${data.error}`]);
+                            }
+                        } catch {
+                            // skip malformed JSON
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Create index error:', err);
+            setErrors((prev) => [...prev, err.message]);
+        }
     };
 
     const handleClose = () => {
-        if (creating) return; // prevent closing mid-creation
+        if (creating && !isComplete) return; // prevent closing mid-creation
         clearAll();
         setIndexName('');
         setIndexDesc('');
         setCreating(false);
+        setIsComplete(false);
         setProgress(0);
         onClose();
     };
@@ -195,7 +283,7 @@ export default function CreateIndexModal({ open, onClose }) {
                     <h2 className="text-xl font-bold text-gray-900">Create Index</h2>
                     <button
                         onClick={handleClose}
-                        disabled={creating}
+                        disabled={creating && !isComplete}
                         className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-40"
                         aria-label="Close"
                     >
@@ -376,35 +464,55 @@ export default function CreateIndexModal({ open, onClose }) {
                     {creating && (
                         <div className="mb-5">
                             <div className="flex items-center gap-2 mb-2">
-                                <Loader2 className="w-4 h-4 text-primary-500 animate-spin" strokeWidth={2} />
-                                <span className="text-sm text-gray-600 font-medium">{STATUS_MESSAGES[statusIdx]}</span>
+                                {isComplete ? (
+                                    <Check className="w-4 h-4 text-green-600" strokeWidth={3} />
+                                ) : (
+                                    <Loader2 className="w-4 h-4 text-primary-500 animate-spin" strokeWidth={2} />
+                                )}
+                                <span className={`text-sm font-medium ${isComplete ? 'text-green-700' : 'text-gray-600'}`}>
+                                    {statusMessage || STATUS_MESSAGES[statusIdx]}
+                                </span>
                             </div>
                             <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
                                 <div
-                                    className="h-full rounded-full transition-all duration-300 ease-out"
+                                    className="h-full rounded-full transition-all duration-500 ease-out"
                                     style={{
                                         width: `${progress}%`,
-                                        background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
+                                        background: isComplete
+                                            ? '#16A34A' // green-600
+                                            : 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
                                     }}
                                 />
                             </div>
-                            <p className="text-xs text-gray-400 mt-1.5">
-                                Estimated time remaining: {estimatedTime}
-                            </p>
+                            <div className="flex items-center justify-between mt-1.5">
+                                <p className="text-xs text-gray-400">
+                                    {completed} of {videos.length} video{videos.length !== 1 ? 's' : ''} processed
+                                </p>
+                                {!isComplete && (
+                                    <p className="text-xs text-gray-400">
+                                        Est. {estimatedTime} remaining
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
 
                     <button
                         onClick={handleCreate}
-                        disabled={creating || !indexName.trim() || videos.length === 0}
-                        className="w-full py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer
-                                   disabled:opacity-40 disabled:cursor-not-allowed
-                                   text-gray-900 hover:brightness-95"
+                        disabled={!isComplete && (creating || !indexName.trim() || videos.length === 0)}
+                        className={`w-full py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer
+                                   text-gray-900 hover:brightness-95
+                                   disabled:opacity-40 disabled:cursor-not-allowed`}
                         style={{
-                            background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
+                            background: isComplete
+                                ? '#4ADE80' // green-400
+                                : 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
                         }}
                     >
-                        {creating ? 'Creating Index…' : 'Create Index'}
+                        {isComplete
+                            ? <span className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> View Index</span>
+                            : (creating ? 'Creating Index…' : 'Create Index')
+                        }
                     </button>
 
                     {!creating && !indexName.trim() && videos.length === 0 && (
