@@ -1,26 +1,161 @@
 @import "tailwindcss";
 
+@theme {
+    --color-primary-50: #F7FEE7;
+    --color-primary-100: #ECFCCB;
+    --color-primary-200: #D9F99D;
+    --color-primary-300: #BEF264;
+    --color-primary-400: #A3E635;
+    --color-primary-500: #84CC16;
+    --color-primary-600: #65A30D;
+    --color-primary-700: #4D7C0F;
+
+    --color-secondary-50: #FFFBEB;
+    --color-secondary-100: #FEF3C7;
+    --color-secondary-200: #FDE68A;
+    --color-secondary-300: #FCD34D;
+    --color-secondary-400: #FBBF24;
+    --color-secondary-500: #F59E0B;
+    --color-secondary-600: #D97706;
+
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+    --radius-card: 1rem;
+
+    --shadow-card: 0 6px 14px rgba(0, 0, 0, 0.05);
+    --shadow-card-hover: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ─── Light mode (default) ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+    --bg: #FFFFFF;
+    --surface: #FFFFFF;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border: #E5E7EB;
+    --glass-overlay: rgba(255, 255, 255, 0.8);
+    --shadow-ambient: rgba(0, 0, 0, 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Dark mode ─── */
+.dark {
+    --bg: #18181B;
+    --surface: #1F2937;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #71717A;
+    --border: #27272A;
+    --glass-overlay: rgba(24, 24, 27, 0.8);
+    --shadow-ambient: rgba(0, 0, 0, 0.3);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Base resets ─── */
+* {
+    box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ─── Gradient utilities ─── */
+.gradient-bg {
+    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gradient-border {
+    border: 1px solid transparent;
+    background-image: linear-gradient(var(--surface), var(--surface)),
+        linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+}
+
+.gradient-wash {
+    position: relative;
+}
+
+.gradient-wash::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    opacity: 0.1;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.dark .gradient-wash::before {
+    opacity: 0.06;
+}
+
+/* ─── Card lift interaction ─── */
+.card-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-card-hover);
+}
+
+/* ─── Scrollbar styling ─── */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+}
+
+/* ─── Pop-in animations ─── */
+@keyframes pop-in {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-pop-in {
+    animation: pop-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-fade-in {
+    animation: fade-in 0.15s ease-out forwards;
+}
+
+.animate-tooltip {
+    animation: pop-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
