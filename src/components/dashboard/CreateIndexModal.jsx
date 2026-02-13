@@ -46,12 +46,13 @@ function getVideoDuration(file) {
     });
 }
 
-export default function CreateIndexModal({ open, onClose }) {
+export default function CreateIndexModal({ open, onClose, presetIndexName, presetDescription }) {
     const router = useRouter();
+    const isPresetMode = Boolean(presetIndexName);
 
     // ─── Form state ───
-    const [indexName, setIndexName] = useState('');
-    const [indexDesc, setIndexDesc] = useState('');
+    const [indexName, setIndexName] = useState(presetIndexName || '');
+    const [indexDesc, setIndexDesc] = useState(presetDescription || '');
     const [videos, setVideos] = useState([]);          // { id, file, name, size, duration, thumbUrl }
     const [errors, setErrors] = useState([]);           // rejected-file error strings
 
@@ -151,7 +152,12 @@ export default function CreateIndexModal({ open, onClose }) {
 
     const handleCreate = async () => {
         if (isComplete) {
-            router.push(`/${indexName}`);
+            if (isPresetMode) {
+                handleClose();
+                window.location.reload();
+            } else {
+                router.push(`/${indexName}`);
+            }
             return;
         }
 
@@ -256,8 +262,8 @@ export default function CreateIndexModal({ open, onClose }) {
     const handleClose = () => {
         if (creating && !isComplete) return; // prevent closing mid-creation
         clearAll();
-        setIndexName('');
-        setIndexDesc('');
+        setIndexName(presetIndexName || '');
+        setIndexDesc(presetDescription || '');
         setCreating(false);
         setIsComplete(false);
         setProgress(0);
@@ -280,7 +286,7 @@ export default function CreateIndexModal({ open, onClose }) {
 
                 {/* ─── Header ─── */}
                 <div className="flex items-center justify-between px-8 pt-8 pb-2">
-                    <h2 className="text-xl font-bold text-gray-900">Create Index</h2>
+                    <h2 className="text-xl font-bold text-gray-900">{isPresetMode ? 'Upload Videos' : 'Create Index'}</h2>
                     <button
                         onClick={handleClose}
                         disabled={creating && !isComplete}
@@ -307,7 +313,7 @@ export default function CreateIndexModal({ open, onClose }) {
                             value={indexName}
                             onChange={(e) => setIndexName(e.target.value)}
                             placeholder="e.g. Autonomous Driving Q1 Batch"
-                            disabled={creating}
+                            disabled={creating || isPresetMode}
                             className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition disabled:opacity-60"
                         />
                     </div>
@@ -325,7 +331,7 @@ export default function CreateIndexModal({ open, onClose }) {
                             onChange={(e) => setIndexDesc(e.target.value)}
                             placeholder="e.g. Dashcam footage for perception model training data…"
                             rows={3}
-                            disabled={creating}
+                            disabled={creating || isPresetMode}
                             className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition resize-none disabled:opacity-60"
                         />
                     </div>
@@ -510,8 +516,10 @@ export default function CreateIndexModal({ open, onClose }) {
                         }}
                     >
                         {isComplete
-                            ? <span className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> View Index</span>
-                            : (creating ? 'Creating Index…' : 'Create Index')
+                            ? <span className="flex items-center justify-center gap-2">{isPresetMode ? 'Done' : 'View Index'}</span>
+                            : (creating
+                                ? (isPresetMode ? 'Uploading…' : 'Creating Index…')
+                                : (isPresetMode ? 'Upload Videos' : 'Create Index'))
                         }
                     </button>
 

@@ -12,9 +12,10 @@ export async function GET(request) {
 
     for await (const index of indexPager) {
         if (index.indexName === process.env.TL_INDEX_NAME) {
-            indexId = index.indexId
+            indexId = index.id
         }
     }
+
 
     if (!indexId) {
         return NextResponse.json({ error: "Index not found" }, { status: 404 })
