@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useCallback, useEffect } from 'react';
-import { Search, Film, X, Clock, Monitor, Gauge, CheckCircle2 } from 'lucide-react';
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
+import { Search, Film, X, Clock, Monitor, Gauge, CheckCircle2, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import Hls from 'hls.js';
 
 /** Pretty-print seconds → 0:04 / 1:23:45 */
@@ -35,8 +36,69 @@ function formatDate(isoString) {
     });
 }
 
+const STATUS_CONFIG = {
+    ready: {
+        color: 'bg-green-500',
+        ring: 'ring-green-500/30',
+        label: 'Ready',
+        description: 'Label annotation complete',
+    },
+    processing: {
+        color: 'bg-amber-500',
+        ring: 'ring-amber-500/30',
+        label: 'Processing',
+        description: 'TwelveLabs is currently watching',
+        pulse: true,
+    },
+    needs_review: {
+        color: 'bg-red-500',
+        ring: 'ring-red-500/30',
+        label: 'Needs Review',
+        description: 'Low confidence score, human reviewer needed',
+    },
+};
+
+/** Status indicator dot with animated tooltip */
+function StatusIndicator({ status }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const cfg = STATUS_CONFIG[status];
+    if (!cfg) return null;
+
+    return (
+        <div
+            className="relative z-20"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+        >
+            {/* Dot */}
+            <div className={`w-3 h-3 rounded-full ${cfg.color} ring-4 ${cfg.ring} ${cfg.pulse ? 'animate-pulse' : ''}`} />
+
+            {/* Tooltip */}
+            <div
+                className={`
+                    absolute right-0 top-full mt-2 px-3 py-2 rounded-lg
+                    bg-gray-900 dark:bg-gray-800 shadow-lg border border-gray-700
+                    whitespace-nowrap pointer-events-none
+                    transition-all duration-200 origin-top-right
+                    ${showTooltip
+                        ? 'opacity-100 scale-100 translate-y-0'
+                        : 'opacity-0 scale-95 -translate-y-1'}
+                `}
+            >
+                <div className="flex items-center gap-2 mb-0.5">
+                    <div className={`w-2 h-2 rounded-full ${cfg.color}`} />
+                    <span className="text-xs font-semibold text-white">{cfg.label}</span>
+                </div>
+                <p className="text-[10px] text-gray-400">{cfg.description}</p>
+                {/* Arrow */}
+                <div className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-gray-700" />
+            </div>
+        </div>
+    );
+}
+
 /** Individual video card with hover-to-play */
-function VideoCard({ video, isSelected, onToggleSelect }) {
+function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const sys = video.systemMetadata || {};
@@ -133,6 +195,13 @@ function VideoCard({ video, isSelected, onToggleSelect }) {
                 </div>
             </div>
 
+            {/* Status indicator */}
+            {status && (
+                <div className="absolute top-3 right-3 z-20">
+                    <StatusIndicator status={status} />
+                </div>
+            )}
+
             {/* Thumbnail + hover video */}
             <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
                 {/* Thumbnail (always behind) */}
@@ -201,12 +270,24 @@ function VideoCard({ video, isSelected, onToggleSelect }) {
                         <span>{formatDate(createdAt)}</span>
                     </div>
                 )}
+
+                {/* View Annotation link */}
+                {status && (
+                    <Link
+                        href={`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                        View Annotation
+                    </Link>
+                )}
             </div>
         </div>
     );
 }
 
-export default function VideoList({ videos, indexName, search, onSearchChange, selectedIds, onToggleSelect }) {
+export default function VideoList({ videos, indexName, search, onSearchChange, selectedIds, onToggleSelect, videoStatuses = {} }) {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return videos;
@@ -270,6 +351,8 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
                         video={video}
                         isSelected={selectedIds.has(video.id)}
                         onToggleSelect={onToggleSelect}
+                        status={videoStatuses[video.id]}
+                        indexName={indexName}
                     />
                 ))}
             </div>

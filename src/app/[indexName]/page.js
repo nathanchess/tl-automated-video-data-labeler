@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Plus, Sparkles, RefreshCw, Tag, X, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Sparkles, RefreshCw, Tag, X, PlusCircle, Download } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import VideoList from '@/components/dashboard/VideoList';
 import CreateIndexModal from '@/components/dashboard/CreateIndexModal';
@@ -38,6 +38,9 @@ export default function IndexDetailPage({ params }) {
     const [suggestedClasses, setSuggestedClasses] = useState(null);
     const [analyzingClasses, setAnalyzingClasses] = useState(false);
     const [analyzeError, setAnalyzeError] = useState(null);
+
+    // Video annotation statuses (videoId -> 'ready' | 'processing' | 'needs_review')
+    const [videoStatuses, setVideoStatuses] = useState({});
 
     // Domain-specific labels
     const [domainLabels, setDomainLabels] = useState(new Set());
@@ -231,16 +234,39 @@ Return ONLY a JSON object with a key 'suggested_classes' containing a list of st
                             </p>
                         </div>
 
-                        {/* Upload button */}
+                        {/* Header actions */}
                         {!loading && (
-                            <button
-                                onClick={() => setUploadModalOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-900 cursor-pointer hover:brightness-95 transition-all shrink-0"
-                                style={{ background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)' }}
-                            >
-                                <Plus className="w-4 h-4" strokeWidth={2} />
-                                Upload Videos
-                            </button>
+                            <div className="flex items-center gap-3 shrink-0">
+                                {/* Download Annotations */}
+                                <div className="relative group/dl">
+                                    <button
+                                        disabled={Object.keys(videoStatuses).length === 0}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${Object.keys(videoStatuses).length > 0
+                                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 cursor-pointer'
+                                                : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        <Download className="w-4 h-4" strokeWidth={2} />
+                                        Download Annotations
+                                    </button>
+                                    {Object.keys(videoStatuses).length === 0 && (
+                                        <div className="absolute right-0 top-full mt-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-800 shadow-lg border border-gray-700 whitespace-nowrap pointer-events-none opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 z-30">
+                                            <p className="text-xs text-gray-300">Annotate at least one video first</p>
+                                            <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-gray-700" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Upload Videos */}
+                                <button
+                                    onClick={() => setUploadModalOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-900 cursor-pointer hover:brightness-95 transition-all"
+                                    style={{ background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)' }}
+                                >
+                                    <Plus className="w-4 h-4" strokeWidth={2} />
+                                    Upload Videos
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -412,6 +438,7 @@ Return ONLY a JSON object with a key 'suggested_classes' containing a list of st
                         onSearchChange={setSearch}
                         selectedIds={selectedIds}
                         onToggleSelect={toggleSelect}
+                        videoStatuses={videoStatuses}
                     />
                 )}
             </main>
