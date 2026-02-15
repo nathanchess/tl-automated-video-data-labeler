@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { Search, Film, X, Clock, Monitor, Gauge, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Search, Film, X, Clock, Monitor, Gauge, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import Hls from 'hls.js';
 
@@ -98,7 +99,7 @@ function StatusIndicator({ status }) {
 }
 
 /** Individual video card with hover-to-play */
-function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
+function VideoCard({ video, isSelected, onToggleSelect, status, indexName, matches }) {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const sys = video.systemMetadata || {};
@@ -108,7 +109,13 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
     const width = sys.width;
     const height = sys.height;
     const size = sys.size;
-    const thumbnailUrl = video.hls?.thumbnail_urls?.[0];
+
+    // Semantic Search Context
+    const bestMatch = matches && matches.length > 0 ? matches[0] : null;
+    const matchCount = matches ? matches.length : 0;
+
+    // Prefer match thumbnail if available
+    const thumbnailUrl = bestMatch?.thumbnailUrl || video.hls?.thumbnail_urls?.[0];
     const hlsUrl = video.hls?.video_url;
     const createdAt = video.createdAt;
 
@@ -129,25 +136,33 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
         // Show the video element over the thumbnail
         videoEl.style.opacity = '1';
 
+        // Wait a tiny bit (simulate loading) or start playing immediately
         if (Hls.isSupported()) {
             const hls = new Hls({
                 enableWorker: false,
                 lowLatencyMode: false,
                 maxBufferLength: 5,
                 maxMaxBufferLength: 10,
+                startPosition: bestMatch ? bestMatch.start : -1
             });
             hls.loadSource(hlsUrl);
             hls.attachMedia(videoEl);
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                videoEl.currentTime = bestMatch ? bestMatch.start : 0;
                 videoEl.play().catch(() => { });
             });
             hlsRef.current = hls;
         } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
             // Native HLS (Safari)
             videoEl.src = hlsUrl;
+            videoEl.currentTime = bestMatch ? bestMatch.start : 0;
+            videoEl.play().catch(() => { });
+        } else {
+            // Fallback for non-HLS (MP4 direct) if supported
+            videoEl.currentTime = bestMatch ? bestMatch.start : 0;
             videoEl.play().catch(() => { });
         }
-    }, [hlsUrl]);
+    }, [hlsUrl, bestMatch]);
 
     const handleMouseLeave = useCallback(() => {
         const videoEl = videoRef.current;
@@ -156,7 +171,7 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
         // Hide video, show thumbnail
         videoEl.style.opacity = '0';
         videoEl.pause();
-        videoEl.removeAttribute('src');
+        videoEl.removeAttribute('src'); // Stop buffering
         videoEl.load();
 
         if (hlsRef.current) {
@@ -165,40 +180,72 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
         }
     }, []);
 
+    const isAnnotated = status === 'ready' || status === 'needs_review';
+
+    const handleCardClick = () => {
+        if (isAnnotated) {
+            // Open annotation page in new tab
+            window.open(`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`, '_blank');
+        } else if (status !== 'processing') {
+            onToggleSelect(video.id);
+        }
+    };
+
     return (
         <div
-            onClick={() => onToggleSelect(video.id)}
+            onClick={handleCardClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             className={`
                 group relative rounded-2xl bg-[var(--surface)] border-2 overflow-hidden shadow-card card-lift cursor-pointer transition-all duration-150
-                ${isSelected
-                    ? 'border-primary-500 ring-2 ring-primary-400/30'
-                    : 'border-[var(--border)] hover:border-[var(--text-tertiary)]'}
+                ${isAnnotated
+                    ? 'border-green-500/40 hover:border-green-500/60'
+                    : isSelected
+                        ? 'border-primary-500 ring-2 ring-primary-400/30'
+                        : matches
+                            ? 'border-indigo-500/50 hover:border-indigo-500/70 ring-1 ring-indigo-500/20'
+                            : 'border-[var(--border)] hover:border-[var(--text-tertiary)]'}
             `}
         >
             {/* Hover glow */}
             <div className="absolute bottom-0 left-0 right-0 h-[3px] gradient-bg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10" />
 
-            {/* Selection check */}
-            <div className={`
-                absolute top-3 left-3 z-20 transition-all duration-150
-                ${isSelected ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-hover:opacity-60 group-hover:scale-100'}
-            `}>
+            {/* Selection check — hidden for annotated videos */}
+            {!isAnnotated && (
                 <div className={`
-                    w-6 h-6 rounded-full flex items-center justify-center
-                    ${isSelected
-                        ? 'bg-primary-500 text-gray-900'
-                        : 'bg-black/40 text-white backdrop-blur-sm'}
+                    absolute top-3 left-3 z-20 transition-all duration-150
+                    ${isSelected ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-hover:opacity-60 group-hover:scale-100'}
                 `}>
-                    <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
+                    <div className={`
+                        w-6 h-6 rounded-full flex items-center justify-center
+                        ${isSelected
+                            ? 'bg-primary-500 text-gray-900'
+                            : 'bg-black/40 text-white backdrop-blur-sm'}
+                    `}>
+                        <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Status indicator */}
             {status && (
                 <div className="absolute top-3 right-3 z-20">
                     <StatusIndicator status={status} />
+                </div>
+            )}
+
+            {/* Semantic Match Badge */}
+            {bestMatch && (
+                <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start animate-fade-in-up">
+                    <div className="px-2 py-1 bg-indigo-500/90 text-white text-xs font-bold rounded-lg shadow-lg flex items-center gap-1.5 backdrop-blur-sm">
+                        <Sparkles className="w-3 h-3 text-yellow-300" />
+                        <span>Match found at {formatDuration(bestMatch.start)}</span>
+                    </div>
+                    {matchCount > 1 && (
+                        <div className="px-2 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded-md backdrop-blur-sm">
+                            +{matchCount - 1} more segments
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -209,7 +256,7 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
                     <img
                         src={thumbnailUrl}
                         alt={filename}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         loading="lazy"
                     />
                 ) : (
@@ -273,31 +320,73 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName }) {
 
                 {/* View Annotation link */}
                 {status && (
-                    <Link
-                        href={`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
-                        View Annotation
-                    </Link>
+                    status === 'processing' ? (
+                        <div className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-gray-500/10 text-gray-400 cursor-not-allowed">
+                            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                            Processing…
+                        </div>
+                    ) : (
+                        <Link
+                            href={`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                            View Annotation
+                        </Link>
+                    )
                 )}
             </div>
         </div>
     );
 }
 
-export default function VideoList({ videos, indexName, search, onSearchChange, selectedIds, onToggleSelect, videoStatuses = {} }) {
+export default function VideoList({ videos, indexName, search, onSearchChange, selectedIds, onToggleSelect, videoStatuses = {}, searchResults = null }) {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return videos;
 
+        // Semantic Search Filter
+        if (searchResults) {
+            const resultIds = new Set(searchResults.map(r => r.id));
+            // Filter logic: Only include videos present in search results
+            return videos.filter(v => resultIds.has(v.id));
+
+            // TODO: Sort by search result order (rank/score)
+            // But search results are already sorted by rank usually?
+            // Since we iterate `videos` (which is chronological usually), we might lose sort order.
+            // Better: map searchResults to video objects.
+
+            /*
+            const videoMap = new Map(videos.map(v => [v.id, v]));
+            const sorted = [];
+            searchResults.forEach(r => {
+                const v = videoMap.get(r.id);
+                if (v) sorted.push(v);
+            });
+            return sorted;
+            
+            Let's stick to simple filter for safely first, but sorting is better UX.
+            */
+        }
+
+        // Fallback: Local Filename Search
         return videos.filter((v) => {
             const sys = v.systemMetadata || {};
             const haystack = [sys.filename || ''].join(' ').toLowerCase();
             return haystack.includes(q);
         });
-    }, [videos, search]);
+    }, [videos, search, searchResults]);
+
+    // Construct map of matches for VideoCard
+    const matchesMap = useMemo(() => {
+        if (!searchResults) return {};
+        const map = {};
+        searchResults.forEach(r => map[r.id] = r.clips);
+        return map;
+    }, [searchResults]);
 
     if (videos.length === 0) {
         return (
@@ -315,31 +404,17 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
 
     return (
         <div>
-            {/* Search / filter bar */}
-            <div className="relative mb-6 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Search videos…"
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition"
-                />
-                {search && (
-                    <button
-                        onClick={() => onSearchChange('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                        aria-label="Clear search"
-                    >
-                        <X className="w-3.5 h-3.5 text-[var(--text-tertiary)]" strokeWidth={2} />
-                    </button>
-                )}
-            </div>
-
             {/* Results count */}
             {search && (
-                <p className="text-xs text-[var(--text-secondary)] mb-4">
-                    Showing {filtered.length} of {videos.length} video{videos.length !== 1 ? 's' : ''}
+                <p className="text-xs text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+                    {searchResults ? (
+                        <>
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Found {filtered.length} relevant results</span>
+                        </>
+                    ) : (
+                        <span>Showing {filtered.length} of {videos.length} video{videos.length !== 1 ? 's' : ''}</span>
+                    )}
                 </p>
             )}
 
@@ -353,6 +428,7 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
                         onToggleSelect={onToggleSelect}
                         status={videoStatuses[video.id]}
                         indexName={indexName}
+                        matches={matchesMap[video.id]}
                     />
                 ))}
             </div>

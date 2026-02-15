@@ -16,7 +16,6 @@ export async function GET(request) {
         }
     }
 
-
     if (!indexId) {
         return NextResponse.json({ error: "Index not found" }, { status: 404 })
     }
@@ -25,8 +24,36 @@ export async function GET(request) {
     const videos = []
 
     for await (const video of videoPager) {
-        videos.push(video)
+
+        const videoData = await tl_client.indexes.videos.retrieve(
+            indexId,
+            video.id,
+            {
+                embeddingOption: ['visual']
+            }
+        )
+
+        console.log(video.id)
+
+        const embedding_segments = videoData.embedding.videoEmbedding?.segments
+        const embeddings = []
+
+        for (const segment of embedding_segments || []) {
+            if (segment.float) {
+                embeddings.push(...segment.float);
+            }
+        }
+
+        videos.push({
+            ...video,
+            embeddings: embeddings
+        })
+
+        console.log(embeddings.length)
+
     }
+
+    console.log(videos.length)
 
     return NextResponse.json(videos, { status: 200 })
 

@@ -9,6 +9,8 @@ export async function POST(request) {
 
     const { videoId, prompt, response_format } = await request.json()
 
+    console.log(`[DEBUG] ${prompt}`)
+
     if (!videoId) {
         return NextResponse.json({ error: "Video ID is required" }, { status: 400 })
     }
@@ -28,6 +30,8 @@ export async function POST(request) {
     }
 
     const result = await tl_client.analyze(parameters)
+
+    console.log(result)
 
     return NextResponse.json(result, { status: 200 })
 
