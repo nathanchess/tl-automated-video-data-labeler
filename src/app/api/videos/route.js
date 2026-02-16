@@ -33,8 +33,6 @@ export async function GET(request) {
             }
         )
 
-        console.log(video.id)
-
         const embedding_segments = videoData.embedding.videoEmbedding?.segments
         const embeddings = []
 
@@ -49,11 +47,7 @@ export async function GET(request) {
             embeddings: embeddings
         })
 
-        console.log(embeddings.length)
-
     }
-
-    console.log(videos.length)
 
     return NextResponse.json(videos, { status: 200 })
 

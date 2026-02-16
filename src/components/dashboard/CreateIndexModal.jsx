@@ -46,7 +46,7 @@ function getVideoDuration(file) {
     });
 }
 
-export default function CreateIndexModal({ open, onClose, presetIndexName, presetDescription }) {
+export default function CreateIndexModal({ open, onClose, onComplete, presetIndexName, presetDescription }) {
     const router = useRouter();
     const isPresetMode = Boolean(presetIndexName);
 
@@ -151,16 +151,6 @@ export default function CreateIndexModal({ open, onClose, presetIndexName, prese
     };
 
     const handleCreate = async () => {
-        if (isComplete) {
-            if (isPresetMode) {
-                handleClose();
-                window.location.reload();
-            } else {
-                router.push(`/${indexName}`);
-            }
-            return;
-        }
-
         setCreating(true);
         setIsComplete(false);
         setProgress(0);
@@ -242,6 +232,18 @@ export default function CreateIndexModal({ open, onClose, presetIndexName, prese
                                 setProgress(100);
                                 setStatusMessage('All videos processed successfully!');
                                 setIsComplete(true);
+
+                                // Auto-close after a brief delay and notify parent
+                                setTimeout(() => {
+                                    clearAll();
+                                    setIndexName(presetIndexName || '');
+                                    setIndexDesc(presetDescription || '');
+                                    setCreating(false);
+                                    setIsComplete(false);
+                                    setProgress(0);
+                                    onClose();
+                                    if (onComplete) onComplete();
+                                }, 1500);
                             }
 
                             if (currentEvent === 'video_error' && data.error) {
@@ -516,7 +518,7 @@ export default function CreateIndexModal({ open, onClose, presetIndexName, prese
                         }}
                     >
                         {isComplete
-                            ? <span className="flex items-center justify-center gap-2">{isPresetMode ? 'Done' : 'View Index'}</span>
+                            ? <span className="flex items-center justify-center gap-2"><Check className="w-4 h-4" strokeWidth={3} /> Complete!</span>
                             : (creating
                                 ? (isPresetMode ? 'Uploading…' : 'Creating Index…')
                                 : (isPresetMode ? 'Upload Videos' : 'Create Index'))

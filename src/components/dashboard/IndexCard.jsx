@@ -1,25 +1,37 @@
+import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 
+const PLACEHOLDER_THUMB = 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" fill="none"><rect width="400" height="300" fill="#e5e7eb"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="system-ui" font-size="14" fill="#9ca3af">No preview</text></svg>`
+);
+
 export default function IndexCard({ title, description, videoCount, date, duration, thumbnails }) {
+    // Ensure we always have 4 thumbnails — fill with placeholders
+    const thumbs = [...(thumbnails || [])];
+    while (thumbs.length < 4) {
+        thumbs.push(PLACEHOLDER_THUMB);
+    }
+
     return (
-        <div
+        <Link
+            href={`/${encodeURIComponent(title)}`}
             className="
-        group relative rounded-2xl bg-[var(--surface)] border border-[var(--border)]
-        overflow-hidden cursor-pointer card-lift shadow-card
-      "
+                group relative rounded-2xl bg-[var(--surface)] border border-[var(--border)]
+                overflow-hidden cursor-pointer card-lift shadow-card block no-underline
+            "
         >
             {/* Hover bottom glow */}
             <div
                 className="
-          absolute bottom-0 left-0 right-0 h-[3px]
-          gradient-bg opacity-0 group-hover:opacity-100
-          transition-opacity duration-200 z-10
-        "
+                    absolute bottom-0 left-0 right-0 h-[3px]
+                    gradient-bg opacity-0 group-hover:opacity-100
+                    transition-opacity duration-200 z-10
+                "
             />
 
             {/* Thumbnail 2×2 bento grid */}
             <div className="grid grid-cols-2 grid-rows-2 gap-0.5 aspect-[2/1] bg-gray-100 dark:bg-gray-800 relative">
-                {thumbnails.map((src, i) => (
+                {thumbs.slice(0, 4).map((src, i) => (
                     <img
                         key={i}
                         src={src}
@@ -31,7 +43,7 @@ export default function IndexCard({ title, description, videoCount, date, durati
 
                 {/* Video count pill */}
                 <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-xs font-mono">
-                    {videoCount} videos
+                    {videoCount} video{videoCount !== 1 ? 's' : ''}
                 </span>
             </div>
 
@@ -57,15 +69,16 @@ export default function IndexCard({ title, description, videoCount, date, durati
                 {/* Kebab menu */}
                 <button
                     className="
-            p-1 rounded-lg opacity-0 group-hover:opacity-100
-            hover:bg-gray-100 dark:hover:bg-gray-700
-            transition-all cursor-pointer shrink-0
-          "
+                        p-1 rounded-lg opacity-0 group-hover:opacity-100
+                        hover:bg-gray-100 dark:hover:bg-gray-700
+                        transition-all cursor-pointer shrink-0
+                    "
                     aria-label="More options"
+                    onClick={(e) => e.preventDefault()}
                 >
                     <MoreVertical className="w-4 h-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
                 </button>
             </div>
-        </div>
+        </Link>
     );
 }

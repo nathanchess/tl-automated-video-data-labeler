@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import PCA from 'pca-js';
-import { Search, ZoomIn, ZoomOut, Maximize, Play, Clock, FileText, Loader2, X } from 'lucide-react';
+import { Search, ZoomIn, ZoomOut, Maximize, Play, Clock, FileText, Loader2, X, ScatterChart, Cpu } from 'lucide-react';
 
 const POINT_SIZE = 16;
 const HOVER_SCALE = 2;
@@ -75,46 +74,73 @@ export default function EmbeddingsView({ videos }) {
                     xs = [0.5];
                     ys = [0.5];
                 } else {
-                    // Normalize/Center vectors first? PCA prefers centered data.
-                    // But pca-js might handle it.
-                    // Given previous issues, let's try PCA but fallback gracefully.
+                    // Lightweight PCA via sample-space gram matrix (N×N) instead of
+                    // feature-space covariance (dim×dim). This avoids O(dim^3) which
+                    // freezes the browser for 2560-dim Marengo embeddings.
+
+                    console.log(`[Embeddings] Starting PCA: ${vectors.length} vectors × ${dim} dims`);
+                    const t0 = performance.now();
 
                     try {
-                        // pca-js expects data as [var1_values, var2_values...] ??
-                        // actually usually [sample1, sample2]
-                        // "computePrincipalComponents" takes data.
-                        // "getEigenVectors" takes data.
-                        // README says: "data: 2D array of data"
-                        // Let's rely on manual projection which gave us control.
-
+                        // 1. Center the data
                         const mean = new Array(dim).fill(0);
                         vectors.forEach(v => v.forEach((val, i) => mean[i] += val));
                         mean.forEach((_, i) => mean[i] /= vectors.length);
-
                         const centered = vectors.map(v => v.map((val, i) => val - mean[i]));
 
-                        // If N=2, we have 1 degree of freedom (line).
-                        // If N >= 2, we can try to find principal components.
+                        const N = centered.length;
 
-                        // Transpose for PCA lib: [dim][samples]
-                        const dataT = mean.map((_, i) => centered.map(row => row[i]));
-
-                        const ev = PCA.getEigenVectors(dataT);
-
-                        if (ev && ev.length > 0 && ev[0]?.vector) {
-                            const ev1 = ev[0].vector;
-                            const ev2 = (ev.length > 1 && ev[1]?.vector) ? ev[1].vector : new Array(dim).fill(0);
-
-                            // Project
-                            xs = centered.map(v => v.reduce((sum, val, i) => sum + val * (ev1[i] || 0), 0));
-                            ys = centered.map(v => v.reduce((sum, val, i) => sum + val * (ev2[i] || 0), 0));
-                        } else {
-                            throw new Error("No eigenvectors found");
+                        // 2. Build N×N gram matrix (K = X · X^T) — much smaller than dim×dim
+                        console.log(`[Embeddings] Building ${N}x${N} gram matrix...`);
+                        const K = Array.from({ length: N }, () => new Array(N).fill(0));
+                        for (let i = 0; i < N; i++) {
+                            for (let j = i; j < N; j++) {
+                                let dot = 0;
+                                for (let d = 0; d < dim; d++) dot += centered[i][d] * centered[j][d];
+                                K[i][j] = dot;
+                                K[j][i] = dot;
+                            }
                         }
 
+                        // 3. Power iteration to find top 2 eigenvectors of gram matrix
+                        const powerIteration = (mat, size, deflateVec) => {
+                            let v = Array.from({ length: size }, () => Math.random() - 0.5);
+                            // Normalize
+                            let norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+                            v = v.map(x => x / norm);
+
+                            for (let iter = 0; iter < 100; iter++) {
+                                // Multiply: w = mat * v
+                                let w = new Array(size).fill(0);
+                                for (let i = 0; i < size; i++) {
+                                    for (let j = 0; j < size; j++) w[i] += mat[i][j] * v[j];
+                                }
+                                // Deflate against previous eigenvector if provided
+                                if (deflateVec) {
+                                    const proj = w.reduce((s, x, i) => s + x * deflateVec[i], 0);
+                                    w = w.map((x, i) => x - proj * deflateVec[i]);
+                                }
+                                norm = Math.sqrt(w.reduce((s, x) => s + x * x, 0));
+                                if (norm < 1e-10) break;
+                                v = w.map(x => x / norm);
+                            }
+                            return v;
+                        };
+
+                        console.log(`[Embeddings] Running power iteration...`);
+                        const alpha1 = powerIteration(K, N, null);
+                        const alpha2 = powerIteration(K, N, alpha1);
+
+                        // 4. Project: xs[i] = alpha1[i], ys[i] = alpha2[i]
+                        // The gram-matrix eigenvectors directly give the projections (up to scale)
+                        xs = alpha1;
+                        ys = alpha2;
+
+                        const elapsed = (performance.now() - t0).toFixed(1);
+                        console.log(`[Embeddings] PCA complete in ${elapsed}ms`);
+
                     } catch (pcaError) {
-                        console.error("PCA failed, falling back to simple projection", pcaError);
-                        // Fallback: Use first 2 dimensions of raw embedding (dumb but works)
+                        console.error("[Embeddings] PCA failed, falling back to raw dimensions", pcaError);
                         xs = vectors.map(v => v[0]);
                         ys = vectors.map(v => v[1] || 0);
                     }
@@ -193,137 +219,168 @@ export default function EmbeddingsView({ videos }) {
     const padding = 60; // Internal padding in pixels
 
     return (
-        <div
-            ref={containerRef}
-            className="relative w-full h-[600px] bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 overflow-hidden select-none cursor-move"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-        >
-            {/* Controls */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                <button onClick={() => setTransform(p => ({ ...p, k: Math.min(p.k + 0.5, 5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                    <ZoomIn className="w-5 h-5" />
-                </button>
-                <button onClick={() => setTransform(p => ({ ...p, k: Math.max(p.k - 0.5, 0.5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                    <ZoomOut className="w-5 h-5" />
-                </button>
-                <div className="h-px bg-gray-200 dark:bg-gray-700 mx-1" />
-                <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                    <Maximize className="w-5 h-5" />
-                </button>
-            </div>
-
-            {/* Error/Loading */}
-            {loading && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-                </div>
-            )}
-            {error && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center text-red-500 bg-red-50/80 dark:bg-red-900/20 p-4 text-center">
-                    Error visualizing embeddings: {error}
-                </div>
-            )}
-
-            {/* Canvas Layers */}
-            {!loading && points.length > 0 && (
-                <div
-                    className="w-full h-full origin-center transition-transform duration-75 ease-out"
-                    style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})` }}
-                >
-                    {points.map(pt => {
-                        // Map 0-1 to pixel coordinates with padding
-                        const w = containerRef.current?.clientWidth || 800;
-                        const h = containerRef.current?.clientHeight || 600;
-
-                        const px = padding + pt.x * (w - padding * 2);
-                        const py = padding + pt.y * (h - padding * 2);
-
-                        const isSelected = selectedVideo?.id === pt.id;
-                        const isHovered = hoveredVideo?.id === pt.id;
-
-                        return (
-                            <div
-                                key={pt.id}
-                                className="absolute flex items-center justify-center transition-all duration-300 ease-spring"
-                                style={{
-                                    left: px,
-                                    top: py,
-                                    width: POINT_SIZE,
-                                    height: POINT_SIZE,
-                                    transform: `translate(-50%, -50%) scale(${isSelected || isHovered ? HOVER_SCALE : 1})`,
-                                    zIndex: isSelected || isHovered ? 50 : 10
-                                }}
-                                onMouseEnter={() => setHoveredVideo(pt.video)}
-                                onMouseLeave={() => setHoveredVideo(null)}
-                                onClick={(e) => { e.stopPropagation(); setSelectedVideo(pt.video); }}
-                            >
-                                <div className={`w-full h-full rounded bg-gradient-to-br from-[#D9F99D] to-[#FDE047] shadow-sm shadow-black/20 ${isSelected ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`} />
-
-                                {/* Hover Tooltip */}
-                                {(isHovered || isSelected) && (
-                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 animate-fade-in-up">
-                                        <div className="w-24 h-14 bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-xl">
-                                            <video
-                                                src={pt.video.hls?.video_url || pt.video.video_url}
-                                                className="w-full h-full object-cover"
-                                                muted
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Empty State */}
-            {!loading && points.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                    No embeddings available to visualize.
-                </div>
-            )}
-
-            {/* Preview Card */}
-            {selectedVideo && (
-                <div className="absolute top-4 right-4 z-30 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
-                    <div className="relative aspect-video bg-black group">
-                        <video
-                            src={selectedVideo.hls?.video_url || selectedVideo.video_url}
-                            controls
-                            autoPlay
-                            className="w-full h-full"
-                        />
-                        <button
-                            onClick={() => setSelectedVideo(null)}
-                            className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
+        <div className="flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
+            {/* Subheaders */}
+            <div className="mb-5">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-xl bg-primary-500/10">
+                        <ScatterChart className="w-5 h-5 text-primary-500" strokeWidth={1.5} />
                     </div>
-                    <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1 mb-1">
-                            {selectedVideo.systemMetadata?.filename || selectedVideo.id}
-                        </h3>
-                        <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                            <span className="flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {Math.round(selectedVideo.systemMetadata?.duration || 0)}s
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <FileText className="w-3.5 h-3.5" />
-                                {((selectedVideo.systemMetadata?.size || 0) / 1024 / 1024).toFixed(1)} MB
-                            </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">
-                            {selectedVideo.user_metadata?.description || "No description available."}
+                    <div>
+                        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                            Embedding Cluster Visualization
+                        </h2>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                            Visualize how your annotated videos cluster in semantic space
                         </p>
                     </div>
                 </div>
-            )}
+                <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] ml-[52px]">
+                    <Cpu className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    <span>
+                        Marengo video embeddings projected to 2D via <strong className="text-[var(--text-secondary)]">Principal Component Analysis (PCA)</strong> — similar videos appear closer together
+                    </span>
+                </div>
+            </div>
+
+            {/* Canvas */}
+            <div
+                ref={containerRef}
+                className="relative w-full flex-1 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 overflow-hidden select-none cursor-move"
+                style={{
+                    backgroundColor: 'var(--surface, #fafafa)',
+                    backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.25) 1px, transparent 1px)',
+                    backgroundSize: '20px 20px',
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+            >
+                {/* Controls */}
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                    <button onClick={() => setTransform(p => ({ ...p, k: Math.min(p.k + 0.5, 5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
+                        <ZoomIn className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => setTransform(p => ({ ...p, k: Math.max(p.k - 0.5, 0.5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
+                        <ZoomOut className="w-5 h-5" />
+                    </button>
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 mx-1" />
+                    <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
+                        <Maximize className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Error/Loading */}
+                {loading && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                    </div>
+                )}
+                {error && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center text-red-500 bg-red-50/80 dark:bg-red-900/20 p-4 text-center">
+                        Error visualizing embeddings: {error}
+                    </div>
+                )}
+
+                {/* Canvas Layers */}
+                {!loading && points.length > 0 && (
+                    <div
+                        className="w-full h-full origin-center transition-transform duration-75 ease-out"
+                        style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})` }}
+                    >
+                        {points.map(pt => {
+                            // Map 0-1 to pixel coordinates with padding
+                            const w = containerRef.current?.clientWidth || 800;
+                            const h = containerRef.current?.clientHeight || 600;
+
+                            const px = padding + pt.x * (w - padding * 2);
+                            const py = padding + pt.y * (h - padding * 2);
+
+                            const isSelected = selectedVideo?.id === pt.id;
+                            const isHovered = hoveredVideo?.id === pt.id;
+
+                            return (
+                                <div
+                                    key={pt.id}
+                                    className="absolute flex items-center justify-center transition-all duration-300 ease-spring"
+                                    style={{
+                                        left: px,
+                                        top: py,
+                                        width: POINT_SIZE,
+                                        height: POINT_SIZE,
+                                        transform: `translate(-50%, -50%) scale(${isSelected || isHovered ? HOVER_SCALE : 1})`,
+                                        zIndex: isSelected || isHovered ? 50 : 10
+                                    }}
+                                    onMouseEnter={() => setHoveredVideo(pt.video)}
+                                    onMouseLeave={() => setHoveredVideo(null)}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedVideo(pt.video); }}
+                                >
+                                    <div className={`w-full h-full rounded bg-gradient-to-br from-[#D9F99D] to-[#FDE047] shadow-sm shadow-black/20 ${isSelected ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`} />
+
+                                    {/* Hover Tooltip */}
+                                    {(isHovered || isSelected) && (
+                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 animate-fade-in-up">
+                                            <div className="w-24 h-14 bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-xl">
+                                                <video
+                                                    src={pt.video.hls?.video_url || pt.video.video_url}
+                                                    className="w-full h-full object-cover"
+                                                    muted
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Empty State */}
+                {!loading && points.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        No embeddings available to visualize.
+                    </div>
+                )}
+
+                {/* Preview Card */}
+                {selectedVideo && (
+                    <div className="absolute top-4 right-4 z-30 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+                        <div className="relative aspect-video bg-black group">
+                            <video
+                                src={selectedVideo.hls?.video_url || selectedVideo.video_url}
+                                controls
+                                autoPlay
+                                className="w-full h-full"
+                            />
+                            <button
+                                onClick={() => setSelectedVideo(null)}
+                                className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1 mb-1">
+                                {selectedVideo.systemMetadata?.filename || selectedVideo.id}
+                            </h3>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                                <span className="flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    {Math.round(selectedVideo.systemMetadata?.duration || 0)}s
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <FileText className="w-3.5 h-3.5" />
+                                    {((selectedVideo.systemMetadata?.size || 0) / 1024 / 1024).toFixed(1)} MB
+                                </span>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">
+                                {selectedVideo.user_metadata?.description || "No description available."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

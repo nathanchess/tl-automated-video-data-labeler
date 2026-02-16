@@ -35,6 +35,7 @@ export default function IndexDetailPage({ params }) {
 
     // Upload modal
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
+    const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
     // Suggested classes from analysis
     const [suggestedClasses, setSuggestedClasses] = useState(null);
@@ -655,6 +656,7 @@ export default function IndexDetailPage({ params }) {
                                 {/* Download Annotations */}
                                 <div className="relative group/dl">
                                     <button
+                                        onClick={() => Object.keys(videoStatuses).length > 0 && setDownloadModalOpen(true)}
                                         disabled={Object.keys(videoStatuses).length === 0}
                                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${Object.keys(videoStatuses).length > 0
                                             ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 cursor-pointer'
@@ -1013,8 +1015,90 @@ export default function IndexDetailPage({ params }) {
             <CreateIndexModal
                 open={uploadModalOpen}
                 onClose={() => setUploadModalOpen(false)}
+                onComplete={fetchVideos}
                 presetIndexName={decodedName}
                 presetDescription={indexDescription}
+            />
+
+            {/* Download modal */}
+            <DownloadModal
+                isOpen={downloadModalOpen}
+                onClose={() => setDownloadModalOpen(false)}
+                totalVideos={Object.keys(annotationResults).length}
+                onDownload={(format) => {
+                    const annotated = videos.filter((v) => annotationResults[v.id]);
+                    let content, filename, mimeType;
+
+                    if (format === 'json') {
+                        const data = annotated.map((v) => ({
+                            videoId: v.id,
+                            filename: v.systemMetadata?.filename || v.id,
+                            duration: v.systemMetadata?.duration || 0,
+                            annotations: annotationResults[v.id] || [],
+                        }));
+                        content = JSON.stringify(data, null, 2);
+                        filename = `${decodedName}_annotations.json`;
+                        mimeType = 'application/json';
+                    } else if (format === 'csv') {
+                        const rows = ['videoId,filename,timestamp_start,timestamp_end,label,description'];
+                        annotated.forEach((v) => {
+                            (annotationResults[v.id] || []).forEach((a) => {
+                                rows.push([
+                                    v.id,
+                                    v.systemMetadata?.filename || v.id,
+                                    a.start_timestamp ?? '',
+                                    a.end_timestamp ?? '',
+                                    `"${(a.label || '').replace(/"/g, '""')}"`,
+                                    `"${(a.description || '').replace(/"/g, '""')}"`,
+                                ].join(','));
+                            });
+                        });
+                        content = rows.join('\n');
+                        filename = `${decodedName}_annotations.csv`;
+                        mimeType = 'text/csv';
+                    } else {
+                        // COCO format
+                        const coco = {
+                            info: { description: decodedName, date_created: new Date().toISOString() },
+                            videos: annotated.map((v, i) => ({
+                                id: i + 1,
+                                file_name: v.systemMetadata?.filename || v.id,
+                                duration: v.systemMetadata?.duration || 0,
+                            })),
+                            annotations: [],
+                            categories: [],
+                        };
+                        const catMap = {};
+                        let annId = 1;
+                        annotated.forEach((v, vi) => {
+                            (annotationResults[v.id] || []).forEach((a) => {
+                                if (a.label && !catMap[a.label]) {
+                                    catMap[a.label] = Object.keys(catMap).length + 1;
+                                }
+                                coco.annotations.push({
+                                    id: annId++,
+                                    video_id: vi + 1,
+                                    category_id: catMap[a.label] || 0,
+                                    start: a.start_timestamp ?? 0,
+                                    end: a.end_timestamp ?? 0,
+                                    description: a.description || '',
+                                });
+                            });
+                        });
+                        coco.categories = Object.entries(catMap).map(([name, id]) => ({ id, name }));
+                        content = JSON.stringify(coco, null, 2);
+                        filename = `${decodedName}_annotations_coco.json`;
+                        mimeType = 'application/json';
+                    }
+
+                    const blob = new Blob([content], { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }}
             />
         </div>
     );

@@ -1,21 +1,10 @@
 import { useMemo } from 'react';
-import { sampleIndexes } from '@/data/sampleIndexes';
 import CreateIndexCard from './UploadCard';
 import IndexCard from './IndexCard';
 
-/** Convert duration strings like "4h 32m" to total minutes for comparison */
-function durationToMinutes(d) {
-    let total = 0;
-    const hours = d.match(/(\d+)h/);
-    const mins = d.match(/(\d+)m/);
-    if (hours) total += parseInt(hours[1], 10) * 60;
-    if (mins) total += parseInt(mins[1], 10);
-    return total;
-}
-
-export default function IndexGrid({ sortBy, filterQuery, onCreateIndex }) {
+export default function IndexGrid({ sortBy, filterQuery, onCreateIndex, indexes, loading }) {
     const filtered = useMemo(() => {
-        let items = [...sampleIndexes];
+        let items = [...(indexes || [])];
 
         // Sort
         switch (sortBy) {
@@ -23,7 +12,7 @@ export default function IndexGrid({ sortBy, filterQuery, onCreateIndex }) {
                 items.sort((a, b) => new Date(b.date) - new Date(a.date));
                 break;
             case 'duration':
-                items.sort((a, b) => durationToMinutes(b.duration) - durationToMinutes(a.duration));
+                items.sort((a, b) => b.totalDurationSec - a.totalDurationSec);
                 break;
             case 'videoCount':
                 items.sort((a, b) => b.videoCount - a.videoCount);
@@ -37,14 +26,30 @@ export default function IndexGrid({ sortBy, filterQuery, onCreateIndex }) {
         }
 
         return items;
-    }, [sortBy, filterQuery]);
+    }, [sortBy, filterQuery, indexes]);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
             <CreateIndexCard onClick={onCreateIndex} />
-            {filtered.map((index) => (
-                <IndexCard key={index.id} {...index} />
-            ))}
+            {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden animate-pulse"
+                    >
+                        <div className="aspect-[2/1] bg-gray-200 dark:bg-gray-700" />
+                        <div className="p-4 space-y-2">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                        </div>
+                    </div>
+                ))
+            ) : (
+                filtered.map((index) => (
+                    <IndexCard key={index.id} {...index} />
+                ))
+            )}
         </div>
     );
 }
