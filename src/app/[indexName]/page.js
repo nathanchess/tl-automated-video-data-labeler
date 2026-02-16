@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, use } from 'react';
+import { useState, useEffect, useCallback, useMemo, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Plus, Sparkles, RefreshCw, Tag, X, PlusCircle, Download, Search, LayoutGrid, Database } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Sparkles, RefreshCw, Tag, X, PlusCircle, Download, Search, LayoutGrid, Database, ArrowRight } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import VideoList from '@/components/dashboard/VideoList';
 import CreateIndexModal from '@/components/dashboard/CreateIndexModal';
@@ -29,6 +29,9 @@ export default function IndexDetailPage({ params }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
+    const [searching, setSearching] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     // Selection state
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -51,6 +54,68 @@ export default function IndexDetailPage({ params }) {
 
     const [activeTab, setActiveTab] = useState('library');
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+
+    const SEARCH_SUGGESTIONS = [
+        'People walking or standing',
+        'Vehicles in motion',
+        'Text or signage visible',
+        'Indoor scene',
+        'Outdoor scene',
+        'Close-up or detailed shot',
+        'Action or movement',
+        'Night time or low light',
+    ];
+
+    const searchRef = useRef(null);
+
+    // Semantic search handler
+    const handleSearch = useCallback(async (query) => {
+        const q = (query || search).trim();
+        if (!q) {
+            setSearchResults(null);
+            return;
+        }
+        setSearching(true);
+        setShowSuggestions(false);
+        try {
+            const res = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: q, indexName: decodedName }),
+            });
+            if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+            const data = await res.json();
+            // data.results contains search results with videoId, start, end, score
+            const results = (data.results || []).map(r => ({
+                id: r.videoId,
+                clips: [{ start: r.start, end: r.end, confidence: r.score || r.confidence }],
+            }));
+            setSearchResults(results);
+        } catch (err) {
+            console.error('Search error:', err);
+            setSearchResults([]);
+        } finally {
+            setSearching(false);
+        }
+    }, [search, decodedName]);
+
+    const clearSearch = useCallback(() => {
+        setSearch('');
+        setSearchResults(null);
+        setIsSearchExpanded(false);
+        setShowSuggestions(false);
+    }, []);
+
+    // Close suggestions on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Domain-specific labels
     const [domainLabels, setDomainLabels] = useState(new Set());
@@ -117,42 +182,44 @@ export default function IndexDetailPage({ params }) {
         return { manualTimeSec, tlTimeSec, timeSavingsPercent, humanCost, tlCost, costSavingsPercent };
     }, [selectedStats]);
 
-    useEffect(() => {
-        async function fetchVideos() {
-            try {
-                const res = await fetch('/api/videos');
-                if (!res.ok) throw new Error(`API error: ${res.status}`);
-                const allVideos = await res.json();
+    const fetchVideos = useCallback(async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/videos');
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            const allVideos = await res.json();
 
-                const filtered = allVideos.filter((v) => {
-                    if (!v.user_metadata) return false;
-                    try {
-                        const meta = typeof v.user_metadata === 'string'
-                            ? JSON.parse(v.user_metadata)
-                            : v.user_metadata;
-                        return meta.indexName === decodedName;
-                    } catch {
-                        return false;
-                    }
-                });
-
-                if (filtered.length > 0) {
-                    const meta = typeof filtered[0].user_metadata === 'string'
-                        ? JSON.parse(filtered[0].user_metadata)
-                        : filtered[0].user_metadata;
-                    setIndexDescription(meta.description || '');
+            const filtered = allVideos.filter((v) => {
+                if (!v.user_metadata) return false;
+                try {
+                    const meta = typeof v.user_metadata === 'string'
+                        ? JSON.parse(v.user_metadata)
+                        : v.user_metadata;
+                    return meta.indexName === decodedName;
+                } catch {
+                    return false;
                 }
+            });
 
-                setVideos(filtered);
-            } catch (err) {
-                console.error('Failed to fetch videos:', err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
+            if (filtered.length > 0) {
+                const meta = typeof filtered[0].user_metadata === 'string'
+                    ? JSON.parse(filtered[0].user_metadata)
+                    : filtered[0].user_metadata;
+                setIndexDescription(meta.description || '');
             }
+
+            setVideos(filtered);
+        } catch (err) {
+            console.error('Failed to fetch videos:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-        fetchVideos();
     }, [decodedName]);
+
+    useEffect(() => {
+        fetchVideos();
+    }, [fetchVideos]);
 
     // Build TwelveLabs response_format JSON schema for structured annotations
     const buildAnalyzeSchema = useCallback(() => {
@@ -620,22 +687,24 @@ export default function IndexDetailPage({ params }) {
                         {!loading && (
                             <div className="flex items-center gap-3 shrink-0">
                                 {/* Semantic Search Bar */}
-                                <div className={`relative transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-64 md:w-96' : 'w-40 md:w-48'}`}>
+                                <div ref={searchRef} className={`relative transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-80 md:w-[480px]' : 'w-56 md:w-64'}`}>
                                     <div className={`
                                         absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors
                                         ${isSearchExpanded ? 'text-primary-500' : 'text-[var(--text-tertiary)]'}
                                     `}>
-                                        <Search className="w-4 h-4" strokeWidth={isSearchExpanded ? 2 : 1.5} />
+                                        {searching
+                                            ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
+                                            : <Search className="w-4 h-4" strokeWidth={isSearchExpanded ? 2 : 1.5} />}
                                     </div>
                                     <input
                                         type="text"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
-                                        onFocus={() => setIsSearchExpanded(true)}
-                                        onBlur={() => !search && setIsSearchExpanded(false)}
-                                        placeholder={isSearchExpanded ? "Search specific moments, objects..." : "Semantic Search..."}
+                                        onFocus={() => { setIsSearchExpanded(true); if (!search) setShowSuggestions(true); }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
+                                        placeholder={isSearchExpanded ? "Describe what you're looking for…" : "Semantic Search…"}
                                         className={`
-                                            w-full pl-10 pr-4 py-2.5 rounded-xl text-sm transition-all
+                                            w-full pl-10 pr-20 py-2.5 rounded-xl text-sm transition-all
                                             border bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]
                                             focus:outline-none focus:ring-2 focus:ring-primary-400/20
                                             ${isSearchExpanded
@@ -643,13 +712,53 @@ export default function IndexDetailPage({ params }) {
                                                 : 'border-[var(--border)] hover:border-[var(--text-secondary)]'}
                                         `}
                                     />
-                                    {search && (
-                                        <button
-                                            onClick={() => { setSearch(''); setIsSearchExpanded(false); }}
-                                            className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
+                                    {/* Action buttons */}
+                                    <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                                        {(search || searchResults) && (
+                                            <button
+                                                onClick={clearSearch}
+                                                className="p-1 rounded-md cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--background)] transition-colors"
+                                                title="Clear search"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                        {search.trim() && (
+                                            <button
+                                                onClick={() => handleSearch()}
+                                                disabled={searching}
+                                                className="p-1.5 rounded-lg cursor-pointer bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-50"
+                                                title="Search (Enter)"
+                                            >
+                                                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Preset Suggestions Dropdown */}
+                                    {showSuggestions && isSearchExpanded && !search && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 overflow-hidden animate-fade-in">
+                                            <div className="px-3 pt-3 pb-1.5">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">Try searching for…</p>
+                                            </div>
+                                            <div className="pb-1.5">
+                                                {SEARCH_SUGGESTIONS.map((suggestion) => (
+                                                    <button
+                                                        key={suggestion}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            setSearch(suggestion);
+                                                            setShowSuggestions(false);
+                                                            handleSearch(suggestion);
+                                                        }}
+                                                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2.5 cursor-pointer"
+                                                    >
+                                                        <Sparkles className="w-3.5 h-3.5 text-primary-400 shrink-0" strokeWidth={1.5} />
+                                                        {suggestion}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
 
@@ -891,6 +1000,7 @@ export default function IndexDetailPage({ params }) {
                                 selectedIds={selectedIds}
                                 onToggleSelect={toggleSelect}
                                 videoStatuses={videoStatuses}
+                                searchResults={searchResults}
                             />
                         )}
                     </>

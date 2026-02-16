@@ -13,25 +13,47 @@ export async function POST(request) {
         return NextResponse.json({ error: "Query is required" }, { status: 400 })
     }
 
+    // Always use the configured TwelveLabs index
+    const targetName = process.env.TL_INDEX_NAME;
+    console.log('[Search] Looking for TwelveLabs index:', targetName);
+
     const indexPager = await tl_client.indexes.list()
     let indexId = null;
 
     for await (const index of indexPager) {
-        if (index.indexName === process.env.TL_INDEX_NAME) {
+        console.log('[Search] Found index:', index.indexName, '→', index.id);
+        if (index.indexName === targetName) {
             indexId = index.id
         }
     }
 
     if (!indexId) {
-        return NextResponse.json({ error: "Index not found" }, { status: 404 })
+        console.error('[Search] Index not found for name:', targetName);
+        return NextResponse.json({ error: `Index "${targetName}" not found` }, { status: 404 })
     }
 
-    const result = await tl_client.search.query({
+    console.log('[Search] Using index:', indexId, 'for query:', query);
+
+    const resultPager = await tl_client.search.query({
         indexId: indexId,
         queryText: query,
         searchOptions: ['visual', 'audio']
     })
 
-    return NextResponse.json(result, { status: 200 })
+    // Collect all search results from the pager into an array
+    const results = [];
+    for (const item of resultPager.data || []) {
+        results.push({
+            videoId: item.videoId || item.video_id,
+            start: item.start,
+            end: item.end,
+            score: item.score,
+            confidence: item.confidence,
+            rank: item.rank,
+            thumbnailUrl: item.thumbnailUrl || item.thumbnail_url,
+        });
+    }
 
+    console.log('[Search] Found', results.length, 'results');
+    return NextResponse.json({ results }, { status: 200 })
 }

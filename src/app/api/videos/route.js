@@ -25,21 +25,45 @@ export async function GET(request) {
 
     for await (const video of videoPager) {
 
-        const videoData = await tl_client.indexes.videos.retrieve(
-            indexId,
-            video.id,
-            {
-                embeddingOption: ['visual']
-            }
-        )
+        let embeddings = [];
 
-        const embedding_segments = videoData.embedding.videoEmbedding?.segments
-        const embeddings = []
+        try {
+            const videoData = await tl_client.indexes.videos.retrieve(
+                indexId,
+                video.id,
+                {
+                    embeddingOption: ['visual']
+                }
+            )
 
-        for (const segment of embedding_segments || []) {
-            if (segment.float) {
-                embeddings.push(...segment.float);
+            const segments = videoData.embedding?.videoEmbedding?.segments || [];
+
+            if (segments.length > 0) {
+                // Initialize sum vector with same dimension as first segment
+                const dim = segments[0].float?.length;
+                if (dim) {
+                    const sum = new Array(dim).fill(0);
+                    let count = 0;
+
+                    for (const seg of segments) {
+                        if (seg.float && seg.float.length === dim) {
+                            for (let i = 0; i < dim; i++) {
+                                sum[i] += seg.float[i];
+                            }
+                            count++;
+                        }
+                    }
+
+                    if (count > 0) {
+                        // Compute average
+                        embeddings = sum.map(val => val / count);
+                    }
+                }
             }
+
+            console.log(`[Videos] ${video.id} → ${embeddings.length} embedding floats`);
+        } catch (embErr) {
+            console.warn(`[Videos] Failed to get embeddings for ${video.id}:`, embErr.message);
         }
 
         videos.push({
