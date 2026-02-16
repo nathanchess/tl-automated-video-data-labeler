@@ -17,6 +17,9 @@ export const metadata = {
   title: "TwelveLabs — Automated Video Data Labeler",
   description:
     "AI-powered video understanding and automated data labeling dashboard",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({ children }) {

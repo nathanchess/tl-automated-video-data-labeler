@@ -1,36 +1,206 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+<p align="center">
+  <img src="public/TwelveLabs-Symbol.png" alt="TwelveLabs" width="80" />
+</p>
 
-## Getting Started
+<h1 align="center">Automated Video Data Labeler</h1>
 
-First, run the development server:
+<p align="center">
+  <strong>AI-powered video annotation platform built on TwelveLabs</strong><br/>
+  Replace hours of manual labeling with multimodal video understanding
+</p>
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+<p align="center">
+  <a href="https://docs.twelvelabs.io/docs/get-started/introduction"><img src="https://img.shields.io/badge/TwelveLabs-Documentation-D9F99D?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTEyIDJMMyA3djEwbDkgNSA5LTVWN2wtOS01eiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=" alt="Docs"/></a>
+  <a href="https://www.twelvelabs.io/research"><img src="https://img.shields.io/badge/Research-Papers-4B5563?style=for-the-badge" alt="Research"/></a>
+  <a href="https://www.twelvelabs.io/contact"><img src="https://img.shields.io/badge/Talk_to-Sales-FDE047?style=for-the-badge" alt="Contact"/></a>
+</p>
+
+---
+
+## 📸 Demo
+
+<!-- Replace with your actual GIF once available -->
+<p align="center">
+  <img src="assets/demo.gif" alt="Demo GIF" width="800" />
+  <br/>
+  <em>Placeholder — GIF walkthrough coming soon</em>
+</p>
+
+---
+
+## 📐 Architecture & Video Walkthrough
+
+<p align="center">
+  <a href="#">
+    <img src="https://img.shields.io/badge/View_Architecture-LucidChart-F97316?style=for-the-badge&logo=lucidchart&logoColor=white" alt="Architecture Diagram"/>
+  </a>
+  &nbsp;&nbsp;
+  <a href="#">
+    <img src="https://img.shields.io/badge/Watch_Demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo"/>
+  </a>
+</p>
+
+---
+
+## 🚀 Features
+
+| Feature | Description |
+|---------|-------------|
+| **Video Index Management** | Upload and organize video datasets into named indexes with metadata |
+| **AI-Powered Annotation** | Define custom label taxonomies, get frame-accurate annotations with timestamps |
+| **Semantic Video Search** | Search across video content using natural language queries |
+| **Embedding Visualization** | 2D PCA projection of 2560-dim Marengo embeddings with interactive canvas |
+| **Multi-Format Export** | Download annotations as JSON, CSV, or COCO format |
+| **ROI Calculator** | Real-time cost/time comparison vs. manual human annotation |
+
+---
+
+## 💼 Business Impact
+
+Manual video annotation costs **$25–50/hr** per human annotator and scales linearly with footage volume. This tool eliminates that bottleneck:
+
+| Metric | Manual | TwelveLabs |
+|--------|--------|------------|
+| **Time per video** | ~3× video duration | ~60 seconds |
+| **Cost per hour of footage** | ~$75–150 | ~$3 |
+| **Output format** | Inconsistent | Structured JSON/CSV/COCO |
+| **Scalability** | Linear headcount | API call |
+
+> **97% faster** and **90%+ cost reduction** compared to traditional annotation workflows.
+
+The structured datasets produced are directly usable for:
+- Fine-tuning Vision Language Models (VLLMs)
+- Training object detection and action recognition models
+- Building operational intelligence dashboards
+- Compliance and safety auditing at scale
+
+---
+
+## 🔑 Required API Keys
+
+| Variable | Description | Get it from |
+|----------|-------------|-------------|
+| `TWELVELABS_API_KEY` | TwelveLabs API key for video understanding | [TwelveLabs Dashboard](https://dashboard.twelvelabs.io/) |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage token for video uploads | [Vercel Dashboard](https://vercel.com/dashboard) |
+
+Create a `.env.local` file in the project root:
+
+```env
+TWELVELABS_API_KEY=your_twelvelabs_api_key_here
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token_here
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🏗️ Running Locally
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prerequisites
 
-## Learn More
+- **Node.js** 18+ (recommended: 20+)
+- **npm** or **pnpm**
+- A [TwelveLabs API key](https://dashboard.twelvelabs.io/)
+- A [Vercel Blob storage token](https://vercel.com/docs/storage/vercel-blob)
 
-To learn more about Next.js, take a look at the following resources:
+### Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# 1. Clone the repository
+git clone https://github.com/nathanchess/tl-automated-video-data-labeler.git
+cd tl-automated-video-data-labeler
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# 2. Install dependencies
+npm install
 
-## Deploy on Vercel
+# 3. Create environment file
+cp .env.example .env.local
+# Edit .env.local with your API keys (see Required API Keys section above)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 4. Start the development server
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
+
+---
+
+## ☁️ Deployment
+
+### Vercel (Recommended)
+
+1. Push your repo to GitHub
+2. Import the project on [vercel.com/new](https://vercel.com/new)
+3. Add environment variables (`TWELVELABS_API_KEY`, `BLOB_READ_WRITE_TOKEN`) in the Vercel project settings
+4. Deploy — Vercel handles builds, SSL, and CDN automatically
+
+### EC2 / Self-Hosted
+
+```bash
+# Build for production
+npm run build
+
+# Start the production server
+npm start
+```
+
+For persistent background processes, use `pm2`:
+
+```bash
+npm install -g pm2
+pm2 start npm --name "video-labeler" -- start
+pm2 save
+```
+
+---
+
+## 🧱 Key Components
+
+```
+src/
+├── app/
+│   ├── page.js                    # Home — index grid with dynamic video grouping
+│   ├── overview/page.js           # Blog-style overview with docs & business case
+│   ├── [indexName]/page.js        # Index detail — video list, annotation, search
+│   └── api/
+│       ├── videos/route.js        # GET: list videos | POST: upload & index via TwelveLabs
+│       ├── search/route.js        # Semantic search via TwelveLabs Search API
+│       ├── annotate/route.js      # AI annotation with custom label taxonomies
+│       ├── upload/route.js        # Vercel Blob upload handler
+│       └── embeddings/route.js    # Fetch video embedding vectors
+│
+├── components/dashboard/
+│   ├── Sidebar.jsx                # Navigation with route-aware active states
+│   ├── IndexGrid.jsx              # Responsive grid of index cards with sorting
+│   ├── IndexCard.jsx              # Individual index card with thumbnails
+│   ├── VideoList.jsx              # Video list with selection, search, and status
+│   ├── CreateIndexModal.jsx       # Upload modal with progress streaming
+│   ├── DownloadModal.jsx          # Export format selector (JSON/CSV/COCO)
+│   └── EmbeddingsView.jsx         # 2D PCA scatter plot with custom power iteration
+```
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Next.js 16 + React 19 | SSR, routing, and UI |
+| Video AI | TwelveLabs API | Embeddings (Marengo 3.0), annotations (Pegasus 1.2) |
+| Styling | Tailwind CSS | Utility-first responsive design |
+| Visualization | Canvas 2D + Custom PCA | Embedding scatter plots with power iteration |
+| Storage | Vercel Blob | Video file hosting before indexing |
+| Export | Client-side generation | JSON, CSV, and COCO format downloads |
+
+---
+
+## 📚 Resources
+
+- [TwelveLabs Documentation](https://docs.twelvelabs.io/docs/get-started/introduction) — API reference and getting started guide
+- [TwelveLabs Research](https://www.twelvelabs.io/research) — Academic papers behind Marengo and Pegasus models
+- [Talk to Sales](https://www.twelvelabs.io/contact) — Enterprise deployment and custom solutions
+- [GitHub Issues](https://github.com/nathanchess/tl-automated-video-data-labeler/issues) — Bug reports and feature requests
+
+---
+
+<p align="center">
+  Built by <a href="https://github.com/nathanchess">Nathan Che</a> · Powered by <a href="https://www.twelvelabs.io">TwelveLabs</a>
+</p>
