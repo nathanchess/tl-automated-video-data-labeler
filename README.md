@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.twelvelabs.io/docs/get-started/introduction"><img src="https://img.shields.io/badge/TwelveLabs-Documentation-D9F99D?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTEyIDJMMyA3djEwbDkgNSA5LTVWN2wtOS01eiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=" alt="Docs"/></a>
-  <a href="https://www.twelvelabs.io/research"><img src="https://img.shields.io/badge/Research-Papers-4B5563?style=for-the-badge" alt="Research"/></a>
-  <a href="https://www.twelvelabs.io/contact"><img src="https://img.shields.io/badge/Talk_to-Sales-FDE047?style=for-the-badge" alt="Contact"/></a>
+  <a href="https://docs.twelvelabs.io/docs/get-started/introduction"><img src="https://img.shields.io/badge/TwelveLabs-Documentation-D9F99D?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMiAzaDZhNCA0IDAgMCAxIDQgNCA0IDQgMCAwIDEgNC00aDZNMTIgN3YxNCIvPjxwYXRoIGQ9Ik0yIDN2MTRhMSAxIDAgMCAwIDEgMWg1YTQgNCAwIDAgMSA0IDQgNCA0IDAgMCAxIDQtNGg1YTEgMSAwIDAgMCAxLTFWMyIvPjwvc3ZnPg==&logoColor=000000" alt="Docs"/></a>
+  <a href="https://www.twelvelabs.io/research"><img src="https://img.shields.io/badge/Research-Papers-4B5563?style=for-the-badge&logo=googlescholar&logoColor=white" alt="Research"/></a>
+  <a href="https://www.twelvelabs.io/contact"><img src="https://img.shields.io/badge/Talk_to-Sales-FDE047?style=for-the-badge&logo=handshake&logoColor=000000" alt="Contact"/></a>
 </p>
 
 ---
@@ -31,13 +31,17 @@
 ## 📐 Architecture & Video Walkthrough
 
 <p align="center">
-  <a href="#">
+  <a href="https://lucid.app/lucidchart/8b6750d8-7df0-45b1-bad7-adafbd079fab/edit?viewport_loc=-1795%2C-232%2C8635%2C4229%2C0_0&invitationId=inv_5887ccd5-587d-4e6f-ac32-e8784da38e4a">
     <img src="https://img.shields.io/badge/View_Architecture-LucidChart-F97316?style=for-the-badge&logo=lucidchart&logoColor=white" alt="Architecture Diagram"/>
   </a>
   &nbsp;&nbsp;
   <a href="#">
     <img src="https://img.shields.io/badge/Watch_Demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo"/>
   </a>
+</p>
+
+<p align="center">
+  <img src="public/architecture.jpeg" alt="Architecture Diagram" width="800" />
 </p>
 
 ---

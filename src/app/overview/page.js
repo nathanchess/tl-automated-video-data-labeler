@@ -146,10 +146,8 @@ export default function OverviewPage() {
 
                     {/* ───── Architecture / Demo Placeholders ───── */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-                        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-gray-50 dark:bg-gray-800/30 p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
-                            <Layers className="w-8 h-8 text-[var(--text-tertiary)] mb-3" strokeWidth={1.5} />
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Architecture Diagram</p>
-                            <p className="text-xs text-[var(--text-tertiary)] mt-1">To be added</p>
+                        <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white dark:bg-gray-800/30">
+                            <img src="/architecture.jpeg" alt="Architecture Diagram" className="w-full h-auto" />
                         </div>
                         <div className="rounded-2xl border border-dashed border-[var(--border)] bg-gray-50 dark:bg-gray-800/30 p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
                             <Video className="w-8 h-8 text-[var(--text-tertiary)] mb-3" strokeWidth={1.5} />
