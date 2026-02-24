@@ -19,20 +19,21 @@
 
 ## 📸 Demo
 
-<!-- Replace with your actual GIF once available -->
 <p align="center">
-  <img src="assets/demo.gif" alt="Demo GIF" width="800" />
+  <a href="https://www.youtube.com/watch?v=lZkDvpmez7A">
+    <img src="https://img.youtube.com/vi/lZkDvpmez7A/hqdefault.jpg" alt="Watch Demo Video" width="800" />
+  </a>
   <br/>
-  <em>Placeholder — GIF walkthrough coming soon</em>
+  <em>▶️ Click to watch the full demo walkthrough on YouTube</em>
 </p>
 
 ---
 
-## 📐 Architecture & Video Walkthrough
+## 📐 Architecture
 
 <p align="center">
   <a href="https://lucid.app/lucidchart/8b6750d8-7df0-45b1-bad7-adafbd079fab/edit?viewport_loc=-1795%2C-232%2C8635%2C4229%2C0_0&invitationId=inv_5887ccd5-587d-4e6f-ac32-e8784da38e4a">
-    <img src="https://img.shields.io/badge/View_Architecture-LucidChart-F97316?style=for-the-badge&logo=lucidchart&logoColor=white" alt="Architecture Diagram"/>
+    <img src="https://img.shields.io/badge/View_Architecture-LucidChart-F97316?style=for-the-badge&logo=youtube&logoColor=white" alt="Architecture Diagram"/>
   </a>
   &nbsp;&nbsp;
   <a href="https://www.youtube.com/watch?v=lZkDvpmez7A">
@@ -42,14 +43,6 @@
 
 <p align="center">
   <img src="public/architecture.jpeg" alt="Architecture Diagram" width="800" />
-</p>
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=lZkDvpmez7A">
-    <img src="https://img.youtube.com/vi/lZkDvpmez7A/maxresdefault.jpg" alt="Watch Demo Video" width="800" />
-  </a>
-  <br/>
-  <em>▶️ Click to watch the full demo walkthrough on YouTube</em>
 </p>
 
 ---
