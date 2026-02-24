@@ -149,10 +149,18 @@ export default function OverviewPage() {
                         <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white dark:bg-gray-800/30">
                             <img src="/architecture.jpeg" alt="Architecture Diagram" className="w-full h-auto" />
                         </div>
-                        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-gray-50 dark:bg-gray-800/30 p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
-                            <Video className="w-8 h-8 text-[var(--text-tertiary)] mb-3" strokeWidth={1.5} />
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Demo Video</p>
-                            <p className="text-xs text-[var(--text-tertiary)] mt-1">To be added</p>
+                        <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white dark:bg-gray-800/30">
+                            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                                <iframe
+                                    className="absolute top-0 left-0 w-full h-full"
+                                    src="https://www.youtube.com/embed/lZkDvpmez7A?si=PYCxFMCEpCNd6sEM"
+                                    title="YouTube video player"
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    allowFullScreen
+                                />
+                            </div>
                         </div>
                     </div>
 

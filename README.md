@@ -35,13 +35,21 @@
     <img src="https://img.shields.io/badge/View_Architecture-LucidChart-F97316?style=for-the-badge&logo=lucidchart&logoColor=white" alt="Architecture Diagram"/>
   </a>
   &nbsp;&nbsp;
-  <a href="#">
+  <a href="https://www.youtube.com/watch?v=lZkDvpmez7A">
     <img src="https://img.shields.io/badge/Watch_Demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo"/>
   </a>
 </p>
 
 <p align="center">
   <img src="public/architecture.jpeg" alt="Architecture Diagram" width="800" />
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=lZkDvpmez7A">
+    <img src="https://img.youtube.com/vi/lZkDvpmez7A/maxresdefault.jpg" alt="Watch Demo Video" width="800" />
+  </a>
+  <br/>
+  <em>▶️ Click to watch the full demo walkthrough on YouTube</em>
 </p>
 
 ---
