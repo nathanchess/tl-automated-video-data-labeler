@@ -191,7 +191,7 @@ export default function OverviewPage() {
                         <StatCard value="97%" label="Faster than manual" icon={Clock} />
                         <StatCard value="90%+" label="Cost reduction" icon={DollarSign} />
                         <StatCard value="3 formats" label="JSON, CSV, COCO" icon={Download} />
-                        <StatCard value="2560-dim" label="Marengo embeddings" icon={Cpu} />
+                        <StatCard value="512-dim" label="Marengo embeddings" icon={Cpu} />
                     </div>
 
                     <Divider />
@@ -226,7 +226,7 @@ export default function OverviewPage() {
                             <FeatureCard
                                 icon={Database}
                                 title="Embedding Visualization"
-                                description="Visualize 2560-dimensional Marengo embeddings projected into 2D space via PCA. See how your videos cluster by semantic similarity."
+                                description="Visualize 512-dimensional Marengo embeddings projected into 2D space via PCA. See how your videos cluster by semantic similarity."
                                 color="text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400"
                             />
                             <FeatureCard
@@ -269,7 +269,7 @@ export default function OverviewPage() {
                             <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-3 ml-10">
                                 Videos are uploaded to TwelveLabs via the <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-xs font-mono text-primary-500">tasks.create()</code> API.
                                 Each video is processed through the Marengo 3.0 engine, which generates multimodal embeddings
-                                encoding visual, audio, and textual content into a 2560-dimensional vector space.
+                                encoding visual, audio, and textual content into a 512-dimensional vector space.
                             </p>
                             <CodeBlock title="route.js — Video ingestion" language="javascript">
                                 {`const task = await tl_client.tasks.create({
@@ -376,7 +376,7 @@ const response = await fetch('/api/annotate', {
                             Understanding Your Data Through Embeddings
                         </h2>
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">
-                            Every video indexed by TwelveLabs is represented as a <strong className="text-[var(--text-primary)]">2560-dimensional embedding vector</strong> generated
+                            Every video indexed by TwelveLabs is represented as a <strong className="text-[var(--text-primary)]">512-dimensional embedding vector</strong> generated
                             by the Marengo 3.0 model. These vectors capture the semantic meaning of video content across visual, audio, and textual modalities.
                         </p>
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">
@@ -386,7 +386,7 @@ const response = await fetch('/api/annotate', {
                         </p>
                         <CodeBlock title="Custom power-iteration PCA (runs in-browser)" language="javascript">
                             {`// Build N×N gram matrix instead of dim×dim covariance
-// This keeps computation O(N³) instead of O(dim³ = 2560³)
+// This keeps computation O(N³) instead of O(dim³ = 512³)
 const gram = Array.from({ length: N }, (_, i) =>
     Array.from({ length: N }, (_, j) =>
         centered[i].reduce((s, v, k) => s + v * centered[j][k], 0)
@@ -421,7 +421,7 @@ for (let iter = 0; iter < 100; iter++) {
                                 {
                                     icon: Cpu,
                                     title: 'Marengo 3.0 — Multimodal Embeddings',
-                                    desc: 'State-of-the-art video representation model that encodes visual, audio, and textual content into a unified 2560-dimensional vector space. Powers semantic search, clustering, and similarity detection.',
+                                    desc: 'State-of-the-art video representation model that encodes visual, audio, and textual content into a unified 512-dimensional vector space. Powers semantic search, clustering, and similarity detection.',
                                 },
                                 {
                                     icon: Zap,

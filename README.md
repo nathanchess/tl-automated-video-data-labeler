@@ -54,7 +54,7 @@
 | **Video Index Management** | Upload and organize video datasets into named indexes with metadata |
 | **AI-Powered Annotation** | Define custom label taxonomies, get frame-accurate annotations with timestamps |
 | **Semantic Video Search** | Search across video content using natural language queries |
-| **Embedding Visualization** | 2D PCA projection of 2560-dim Marengo embeddings with interactive canvas |
+| **Embedding Visualization** | 2D PCA projection of 512-dim Marengo embeddings with interactive canvas |
 | **Multi-Format Export** | Download annotations as JSON, CSV, or COCO format |
 | **ROI Calculator** | Real-time cost/time comparison vs. manual human annotation |
 
@@ -162,8 +162,9 @@ pm2 save
 ```
 src/
 ├── app/
-│   ├── page.js                    # Home — index grid with dynamic video grouping
-│   ├── overview/page.js           # Blog-style overview with docs & business case
+│   ├── page.js                    # Home — overview (docs & business case)
+│   ├── indexes/page.js            # Indexes — index grid with dynamic video grouping
+│   ├── overview/page.js           # Overview (also accessible at /overview)
 │   ├── [indexName]/page.js        # Index detail — video list, annotation, search
 │   └── api/
 │       ├── videos/route.js        # GET: list videos | POST: upload & index via TwelveLabs
