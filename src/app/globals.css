@@ -159,3 +159,24 @@ body {
 .animate-tooltip {
     animation: pop-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+
+/* Upload modal: hide Chrome/WebKit hover overlays (PiP, translate, etc.) on preview <video> */
+.upload-modal-preview-video::-webkit-media-controls {
+    display: none !important;
+}
+
+.upload-modal-preview-video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+.upload-modal-preview-video::-webkit-media-controls-panel {
+    display: none !important;
+}
+
+.upload-modal-preview-video::-webkit-media-controls-play-button {
+    display: none !important;
+}
+
+.upload-modal-preview-video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+}

@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Trash2, CheckCircle, Plus } from 'lucide-react';
 
+function formatTsRange(startTs, endTs) {
+    if (startTs == null && endTs == null) return '';
+    return `${startTs ?? '?'}–${endTs ?? '?'}`;
+}
+
+function getObjectLabel(obj) {
+    const t = obj.label || obj.object || obj.name;
+    return (t && String(t).trim()) || 'Untitled object';
+}
+
+function getActionLabel(act) {
+    const t = act.label || act.action || act.name;
+    return (t && String(t).trim()) || 'Untitled action';
+}
+
 export default function AnnotationEditor({ annotation, onSave, onDelete, onClose }) {
     const [description, setDescription] = useState(annotation.description || '');
     const [objects, setObjects] = useState(annotation.detected_objects || []);
@@ -26,8 +41,10 @@ export default function AnnotationEditor({ annotation, onSave, onDelete, onClose
 
     const addTag = () => {
         if (!newTag.trim()) return;
+        const trimmed = newTag.trim();
         const tag = {
-            label: newTag.trim(),
+            label: trimmed,
+            name: trimmed,
             confidence_score: 1.0, // Manual tags are 100% confident
             start_timestamp: annotation.start_timestamp, // Default to full segment
             end_timestamp: annotation.end_timestamp
@@ -122,14 +139,33 @@ export default function AnnotationEditor({ annotation, onSave, onDelete, onClose
                     <div>
                         <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Objects</h4>
                         <div className="flex flex-wrap gap-2">
-                            {objects.map((obj, i) => (
-                                <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
-                                    {obj.label || obj.object}
-                                    <button onClick={() => removeTag(i, 'object')} className="hover:text-blue-900 dark:hover:text-blue-100">
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </span>
-                            ))}
+                            {objects.map((obj, i) => {
+                                const label = getObjectLabel(obj);
+                                const range = formatTsRange(obj.start_timestamp, obj.end_timestamp);
+                                return (
+                                    <span
+                                        key={i}
+                                        className="inline-flex max-w-full min-w-0 items-start gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                                    >
+                                        <span className="min-w-0 flex-1 leading-snug break-words">
+                                            <span className="font-semibold">{label}</span>
+                                            {range && (
+                                                <span className="block text-[10px] font-mono font-normal text-blue-600/90 dark:text-blue-200/80 mt-0.5">
+                                                    {range}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTag(i, 'object')}
+                                            className="shrink-0 mt-0.5 p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300"
+                                            aria-label={`Remove ${label}`}
+                                        >
+                                            <X className="w-3.5 h-3.5" strokeWidth={2} />
+                                        </button>
+                                    </span>
+                                );
+                            })}
                             {objects.length === 0 && <span className="text-xs text-[var(--text-tertiary)] italic">No objects detected</span>}
                         </div>
                     </div>
@@ -138,14 +174,33 @@ export default function AnnotationEditor({ annotation, onSave, onDelete, onClose
                     <div>
                         <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Actions</h4>
                         <div className="flex flex-wrap gap-2">
-                            {actions.map((act, i) => (
-                                <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
-                                    {act.label || act.action}
-                                    <button onClick={() => removeTag(i, 'action')} className="hover:text-purple-900 dark:hover:text-purple-100">
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </span>
-                            ))}
+                            {actions.map((act, i) => {
+                                const label = getActionLabel(act);
+                                const range = formatTsRange(act.start_timestamp, act.end_timestamp);
+                                return (
+                                    <span
+                                        key={i}
+                                        className="inline-flex max-w-full min-w-0 items-start gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"
+                                    >
+                                        <span className="min-w-0 flex-1 leading-snug break-words">
+                                            <span className="font-semibold">{label}</span>
+                                            {range && (
+                                                <span className="block text-[10px] font-mono font-normal text-purple-600/90 dark:text-purple-200/80 mt-0.5">
+                                                    {range}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTag(i, 'action')}
+                                            className="shrink-0 mt-0.5 p-0.5 rounded hover:bg-purple-100 dark:hover:bg-purple-800/50 text-purple-700 dark:text-purple-300"
+                                            aria-label={`Remove ${label}`}
+                                        >
+                                            <X className="w-3.5 h-3.5" strokeWidth={2} />
+                                        </button>
+                                    </span>
+                                );
+                            })}
                             {actions.length === 0 && <span className="text-xs text-[var(--text-tertiary)] italic">No actions detected</span>}
                         </div>
                     </div>

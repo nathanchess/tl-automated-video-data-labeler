@@ -280,7 +280,7 @@ export default function IndexDetailPage({ params }) {
         setAnalyzingClasses(true);
         setAnalyzeError(null);
         try {
-            const prompt = `Analyze this video and list 5-10 distinct categories of objects, actions, or events that appear frequently and would be valuable for training a computer vision model.
+            const prompt = `Analyze this video and list 5 maximum distinct categories of objects, actions, or events that appear frequently and would be valuable for training a computer vision model.
 
             Focus on:
             - Key Objects (e.g., specific vehicles, tools, distinct people types)
@@ -369,9 +369,10 @@ export default function IndexDetailPage({ params }) {
            - The 'detected_objects' and 'detected_actions' items MUST have their own 'start_timestamp' and 'end_timestamp' which can trigger *within* the scene.
            - Example: Scene is 00:00-00:10. Object 'car' is visible 00:02-00:05. record 00:02-00:05 for the object.
         3. **Atomic Events**: If an object changes state (e.g. from "driving" to "stopped"), create a new annotation segment or distinct action entry.
-        4. **No Overlapping Annotations**: Ensure that no two annotations overlap in time. This means YOU MUST ensure that no two annotations have start_timestamp and end_timestamp that overlap.
-        5. **Full Coverage**: Ensure that the entire video is covered by annotations. This means there should be annotations covering from 0 seconds to ${Math.ceil(duration)} seconds.
-        6. **First Person Perspective**: Ensure that the annotations are from the first person perspective. This means that the annotations should be from the point of view of the camera and DO NOT reference the camera, angles changing, lighting, etc. It should focus on the context and video content, not how it was created.
+        4. **No Overlapping Annotations**: Ensure that no two **scene-level** annotations overlap in time. Each scene has one continuous time range; ranges must form a partition from 00:00 to the end.
+        5. **Full Coverage (no gaps)**: The union of all scene segments must cover **every second** from 00:00 through the full video duration (~${Math.ceil(duration)}s). After sorting scenes by start time: the first scene must start at 00:00; each following scene must start exactly when the previous scene ends; the last scene must end at the video’s end time. Do not leave uncovered gaps (e.g. missing minutes) between scenes.
+        6. **Segment timestamps**: Each scene object in your output must include explicit \`start_timestamp\` and \`end_timestamp\` for the **whole scene** (the full span that scene describes), not only on child items. Child objects/actions still get their own finer timestamps inside that span.
+        7. **First Person Perspective**: Ensure that the annotations are from the first person perspective. This means that the annotations should be from the point of view of the camera and DO NOT reference the camera, angles changing, lighting, etc. It should focus on the context and video content, not how it was created.
 
         For each annotation segment, structure the data exactly as defined in the schema:
         - description: Description of the scene, audio, and events seen within that time frame of the video.
@@ -410,6 +411,8 @@ export default function IndexDetailPage({ params }) {
                         // Handle various potential output structures
                         if (parsed.annotations && Array.isArray(parsed.annotations)) {
                             annotations = parsed.annotations;
+                        } else if (parsed.scene_annotations && Array.isArray(parsed.scene_annotations)) {
+                            annotations = parsed.scene_annotations;
                         } else if (parsed.scene) {
                             // Single scene object
                             annotations = [parsed.scene];
@@ -427,6 +430,7 @@ export default function IndexDetailPage({ params }) {
                         // Fallback for non-string rawData (already parsed JSON?)
                         const d = rawData;
                         if (d?.annotations) annotations = d.annotations;
+                        else if (d?.scene_annotations && Array.isArray(d.scene_annotations)) annotations = d.scene_annotations;
                         else if (d?.scene) annotations = [d.scene];
                         else if (Array.isArray(d)) annotations = d;
                         else annotations = [];
@@ -439,7 +443,9 @@ export default function IndexDetailPage({ params }) {
                         const jsonMatch = text.match(/\{[\s\S]*\}/);
                         if (jsonMatch) {
                             const parsed = JSON.parse(jsonMatch[0]);
-                            annotations = parsed.annotations || [];
+                            if (Array.isArray(parsed.annotations)) annotations = parsed.annotations;
+                            else if (Array.isArray(parsed.scene_annotations)) annotations = parsed.scene_annotations;
+                            else annotations = [];
                         }
                     } catch { /* not JSON either */ }
                 }
@@ -509,6 +515,23 @@ export default function IndexDetailPage({ params }) {
 
                         // Normalize timestamps
                         if (ann.start_timestamp && !ann.timestamp) ann.timestamp = ann.start_timestamp;
+
+                        // Unify label/name on child items (API often returns `name` only)
+                        const unifyTag = (item) => {
+                            const text = item.label || item.object || item.action || item.name;
+                            if (text == null || text === '') return item;
+                            return {
+                                ...item,
+                                label: item.label || text,
+                                name: item.name || text,
+                            };
+                        };
+                        if (Array.isArray(ann.detected_objects)) {
+                            ann.detected_objects = ann.detected_objects.map(unifyTag);
+                        }
+                        if (Array.isArray(ann.detected_actions)) {
+                            ann.detected_actions = ann.detected_actions.map(unifyTag);
+                        }
 
                         return ann;
                     });

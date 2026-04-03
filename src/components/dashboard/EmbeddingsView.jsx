@@ -36,7 +36,7 @@ export default function EmbeddingsView({ videos }) {
 
                     let vec = null;
                     if (Array.isArray(v.embeddings) && v.embeddings.length > 0) {
-                        // Case A: 1D Array [0.1, 0.2, ...] (Expected 2560)
+                        // Case A: 1D Array [0.1, 0.2, ...] (Expected 512)
                         if (typeof v.embeddings[0] === 'number') {
                             vec = v.embeddings;
                         }
@@ -76,7 +76,7 @@ export default function EmbeddingsView({ videos }) {
                 } else {
                     // Lightweight PCA via sample-space gram matrix (N×N) instead of
                     // feature-space covariance (dim×dim). This avoids O(dim^3) which
-                    // freezes the browser for 2560-dim Marengo embeddings.
+                    // freezes the browser for 512-dim Marengo embeddings.
 
                     console.log(`[Embeddings] Starting PCA: ${vectors.length} vectors × ${dim} dims`);
                     const t0 = performance.now();

@@ -7,6 +7,56 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import AnnotationEditor from '@/components/dashboard/AnnotationEditor';
 import Hls from 'hls.js';
 
+/** Parse MM:SS or HH:MM:SS → seconds (same rules as in-component historical helper) */
+function parseTimestampSeconds(ts) {
+    if (ts == null || ts === '') return 0;
+    const parts = String(ts).trim().split(':').map(Number);
+    if (parts.some((n) => Number.isNaN(n))) return 0;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+}
+
+function deriveAnnotationBounds(ann) {
+    let start = parseTimestampSeconds(ann.start_timestamp || ann.timestamp);
+    let end = parseTimestampSeconds(ann.end_timestamp || ann.timestamp);
+    if (!start && !end) {
+        const allChildren = [...(ann.detected_objects || []), ...(ann.detected_actions || [])];
+        if (allChildren.length > 0) {
+            const starts = allChildren.map((c) => parseTimestampSeconds(c.start_timestamp)).filter((t) => !Number.isNaN(t));
+            const ends = allChildren.map((c) => parseTimestampSeconds(c.end_timestamp)).filter((t) => !Number.isNaN(t));
+            if (starts.length) start = Math.min(...starts);
+            if (ends.length) end = Math.max(...ends);
+        }
+    }
+    end = Math.max(end, start + 0.5);
+    return { start, end };
+}
+
+/** Adjacent scene bars on the scrubber with no gaps (assigns dead air to the prior scene for display). */
+function computeContiguousSceneSpans(annotations, durationSec) {
+    if (!annotations?.length || !durationSec || durationSec <= 0) return [];
+    const rows = annotations
+        .map((ann, index) => {
+            const { start, end } = deriveAnnotationBounds(ann);
+            return { index, start, end };
+        })
+        .filter((r) => r.end > r.start)
+        .sort((a, b) => a.start - b.start);
+
+    if (rows.length === 0) return [];
+
+    const spans = [];
+    for (let j = 0; j < rows.length; j++) {
+        const displayStart = j === 0 ? 0 : spans[j - 1].end;
+        let displayEnd = j < rows.length - 1 ? rows[j + 1].start : durationSec;
+        displayEnd = Math.min(durationSec, Math.max(displayEnd, displayStart + 0.5));
+        if (displayEnd <= displayStart) displayEnd = Math.min(durationSec, displayStart + 0.5);
+        spans.push({ annotationIndex: rows[j].index, displayStart, displayEnd });
+    }
+    return spans;
+}
+
 export default function VideoAnnotationPage({ params }) {
     const { indexName, videoName } = use(params);
     const decodedIndex = decodeURIComponent(indexName);
@@ -176,14 +226,7 @@ export default function VideoAnnotationPage({ params }) {
         }
     };
 
-    // Parse timestamp "MM:SS" to seconds
-    const parseTimestamp = (ts) => {
-        if (!ts) return 0;
-        const parts = ts.split(':').map(Number);
-        if (parts.length === 2) return parts[0] * 60 + parts[1];
-        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        return 0;
-    };
+    const parseTimestamp = parseTimestampSeconds;
 
     return (
         <div className="flex min-h-screen">
@@ -304,31 +347,19 @@ export default function VideoAnnotationPage({ params }) {
                                     ))}
                                 </div>
 
-                                {/* LAYER 1: Background Scene/Summary Segments */}
+                                {/* LAYER 1: Background Scene/Summary Segments (contiguous spans — no dead gaps on scrubber) */}
                                 <div className="absolute top-0 bottom-0 left-0 right-0">
-                                    {annotationData.annotations?.map((ann, i) => {
-                                        // Robust timestamp parsing: Use parent timestamps if available, otherwise derive from children
-                                        let start = parseTimestamp(ann.start_timestamp || ann.timestamp);
-                                        let end = parseTimestamp(ann.end_timestamp || ann.timestamp);
-
-                                        if (!start && !end) {
-                                            // Derive from children
-                                            const allChildren = [...(ann.detected_objects || []), ...(ann.detected_actions || [])];
-                                            if (allChildren.length > 0) {
-                                                const starts = allChildren.map(c => parseTimestamp(c.start_timestamp)).filter(t => !isNaN(t));
-                                                const ends = allChildren.map(c => parseTimestamp(c.end_timestamp)).filter(t => !isNaN(t));
-                                                if (starts.length) start = Math.min(...starts);
-                                                if (ends.length) end = Math.max(...ends);
-                                            }
-                                        }
-
+                                    {computeContiguousSceneSpans(annotationData.annotations, duration).map((span) => {
+                                        const i = span.annotationIndex;
+                                        const ann = annotationData.annotations[i];
+                                        if (!ann) return null;
+                                        const { displayStart: start, displayEnd: end } = span;
                                         const durationSeconds = Math.max(0.5, end - start);
                                         const leftPercent = (start / (duration || 1)) * 100;
                                         const widthPercent = (durationSeconds / (duration || 1)) * 100;
 
                                         if (leftPercent > 100) return null;
 
-                                        // Generate randomized pastel color based on description hash or index
                                         const color = generateRandomPastelColor(i + (ann.description?.length || 0));
 
                                         return (
@@ -360,7 +391,7 @@ export default function VideoAnnotationPage({ params }) {
                                             // Objects (key: object)
                                             ann.detected_objects?.forEach(obj => {
                                                 allItems.push({
-                                                    label: obj.object || obj.label, // Handle both new and old keys
+                                                    label: obj.object || obj.label || obj.name,
                                                     type: 'object',
                                                     start: parseTimestamp(obj.start_timestamp),
                                                     end: parseTimestamp(obj.end_timestamp),
@@ -371,7 +402,7 @@ export default function VideoAnnotationPage({ params }) {
                                             // Actions (key: action)
                                             ann.detected_actions?.forEach(act => {
                                                 allItems.push({
-                                                    label: act.action || act.label, // Handle both new and old keys
+                                                    label: act.action || act.label || act.name,
                                                     type: 'action',
                                                     start: parseTimestamp(act.start_timestamp),
                                                     end: parseTimestamp(act.end_timestamp),
@@ -454,8 +485,8 @@ export default function VideoAnnotationPage({ params }) {
                                         // Extract unique labels
                                         const uniqueLabels = new Set();
                                         annotationData.annotations?.forEach(ann => {
-                                            ann.detected_objects?.forEach(o => uniqueLabels.add(o.object || o.label));
-                                            ann.detected_actions?.forEach(a => uniqueLabels.add(a.action || a.label));
+                                            ann.detected_objects?.forEach(o => uniqueLabels.add(o.object || o.label || o.name));
+                                            ann.detected_actions?.forEach(a => uniqueLabels.add(a.action || a.label || a.name));
                                         });
                                         return Array.from(uniqueLabels).map(label => (
                                             <div key={label} className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-1 rounded border border-[var(--border)]">
@@ -560,7 +591,7 @@ export default function VideoAnnotationPage({ params }) {
 
                                                 <div className="flex flex-wrap gap-1.5 pl-2">
                                                     {(ann.detected_objects || []).map((obj, j) => {
-                                                        const label = obj.object || obj.label;
+                                                        const label = obj.object || obj.label || obj.name;
                                                         return (
                                                             <span
                                                                 key={`obj-${j}`}
@@ -578,7 +609,7 @@ export default function VideoAnnotationPage({ params }) {
                                                     })}
 
                                                     {(ann.detected_actions || []).map((act, k) => {
-                                                        const label = act.action || act.label;
+                                                        const label = act.action || act.label || act.name;
                                                         return (
                                                             <span
                                                                 key={`act-${k}`}

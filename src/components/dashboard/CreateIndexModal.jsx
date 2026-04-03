@@ -1,6 +1,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Film, Trash2, AlertCircle, Loader2, Check } from 'lucide-react';
+import { X, Upload, Trash2, AlertCircle, Loader2, Check } from 'lucide-react';
 import { upload } from '@vercel/blob/client';
 
 const MIN_DURATION = 4;        // seconds
@@ -46,6 +46,98 @@ function getVideoDuration(file) {
     });
 }
 
+/** Thumbnail tile: hover plays muted preview; hides native overlays via CSS + video attrs */
+function UploadVideoPreview({ video: v, onRemove, creating }) {
+    const videoRef = useRef(null);
+    const [isHovered, setIsHovered] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+
+    const stopPreview = useCallback(() => {
+        const el = videoRef.current;
+        if (el) {
+            el.pause();
+            el.currentTime = 0;
+        }
+        setIsPlaying(false);
+    }, []);
+
+    const handleEnter = useCallback(async () => {
+        setIsHovered(true);
+        const el = videoRef.current;
+        if (!el || creating) return;
+        try {
+            el.currentTime = 0;
+            await el.play();
+        } catch {
+            setIsPlaying(false);
+        }
+    }, [creating]);
+
+    const handleLeave = useCallback(() => {
+        setIsHovered(false);
+        stopPreview();
+    }, [stopPreview]);
+
+    return (
+        <div
+            className="group/vid relative rounded-xl border border-gray-100 bg-gray-50 overflow-hidden"
+            onMouseEnter={handleEnter}
+            onMouseLeave={handleLeave}
+        >
+            <div className="relative aspect-video bg-gray-200">
+                <video
+                    ref={videoRef}
+                    src={v.thumbUrl}
+                    className="upload-modal-preview-video w-full h-full object-cover select-none"
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    controls={false}
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                />
+                <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono pointer-events-none z-[1]">
+                    {formatDuration(v.duration)}
+                </span>
+                {isHovered && isPlaying && (
+                    <div className="absolute bottom-0 left-0 right-0 z-[1] flex items-center gap-1.5 py-1.5 pl-2 pr-14 bg-gradient-to-t from-black/80 via-black/50 to-transparent text-white text-[10px] font-semibold tracking-wide uppercase pointer-events-none">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-400 opacity-60" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-lime-400" />
+                        </span>
+                        Playing preview
+                    </div>
+                )}
+                {!creating && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onRemove(v.id);
+                        }}
+                        className="absolute top-1.5 right-1.5 z-[2] p-1 rounded-full bg-black/50 text-white opacity-0 group-hover/vid:opacity-100 transition-opacity cursor-pointer hover:bg-red-600"
+                        aria-label="Remove video"
+                    >
+                        <X className="w-3 h-3" strokeWidth={2} />
+                    </button>
+                )}
+            </div>
+            <div className="px-2.5 py-2">
+                <p className="text-xs font-medium text-gray-700 truncate">{v.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-gray-400">{formatBytes(v.size)}</span>
+                    <span className="text-[10px] text-gray-400">·</span>
+                    <span className="text-[10px] text-gray-400">{formatDuration(v.duration)}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function CreateIndexModal({ open, onClose, onComplete, presetIndexName, presetDescription }) {
     const router = useRouter();
     const isPresetMode = Boolean(presetIndexName);
@@ -66,6 +158,8 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
 
     const fileInputRef = useRef(null);
     const idCounter = useRef(0);
+    /** Prevents double submit before React applies `creating`, and after success while the modal is still open */
+    const uploadInFlightRef = useRef(false);
 
     // ─── Cycle status text while creating (fallback when no server message) ───
     useEffect(() => {
@@ -151,6 +245,9 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
     };
 
     const handleCreate = async () => {
+        if (uploadInFlightRef.current) return;
+        uploadInFlightRef.current = true;
+
         setCreating(true);
         setIsComplete(false);
         setProgress(0);
@@ -258,6 +355,8 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
         } catch (err) {
             console.error('Create index error:', err);
             setErrors((prev) => [...prev, err.message]);
+        } finally {
+            uploadInFlightRef.current = false;
         }
     };
 
@@ -273,10 +372,6 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
     };
 
     if (!open) return null;
-
-    const estimatedTime = videos.length <= 1
-        ? '~1 minute'
-        : `~${videos.length} minutes`;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -408,7 +503,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                             <div className="mt-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-xs font-medium text-gray-500">
-                                        {videos.length} video{videos.length !== 1 ? 's' : ''} · Total est. processing {estimatedTime}
+                                        {videos.length} video{videos.length !== 1 ? 's' : ''}
                                     </span>
                                     <button
                                         onClick={clearAll}
@@ -422,43 +517,12 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-1">
                                     {videos.map((v) => (
-                                        <div
+                                        <UploadVideoPreview
                                             key={v.id}
-                                            className="group/vid relative rounded-xl border border-gray-100 bg-gray-50 overflow-hidden"
-                                        >
-                                            {/* Thumbnail */}
-                                            <div className="relative aspect-video bg-gray-200">
-                                                <video
-                                                    src={v.thumbUrl}
-                                                    className="w-full h-full object-cover"
-                                                    muted
-                                                    preload="metadata"
-                                                />
-                                                {/* Duration pill */}
-                                                <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
-                                                    {formatDuration(v.duration)}
-                                                </span>
-                                                {/* Remove button */}
-                                                {!creating && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); removeVideo(v.id); }}
-                                                        className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover/vid:opacity-100 transition-opacity cursor-pointer hover:bg-red-600"
-                                                        aria-label="Remove video"
-                                                    >
-                                                        <X className="w-3 h-3" strokeWidth={2} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {/* Meta */}
-                                            <div className="px-2.5 py-2">
-                                                <p className="text-xs font-medium text-gray-700 truncate">{v.name}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className="text-[10px] text-gray-400">{formatBytes(v.size)}</span>
-                                                    <span className="text-[10px] text-gray-400">·</span>
-                                                    <span className="text-[10px] text-gray-400">{formatDuration(v.duration)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            video={v}
+                                            onRemove={removeVideo}
+                                            creating={creating}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -492,22 +556,16 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                     }}
                                 />
                             </div>
-                            <div className="flex items-center justify-between mt-1.5">
-                                <p className="text-xs text-gray-400">
-                                    {completed} of {videos.length} video{videos.length !== 1 ? 's' : ''} processed
-                                </p>
-                                {!isComplete && (
-                                    <p className="text-xs text-gray-400">
-                                        Est. {estimatedTime} remaining
-                                    </p>
-                                )}
-                            </div>
+                            <p className="text-xs text-gray-400 mt-1.5">
+                                {completed} of {videos.length} video{videos.length !== 1 ? 's' : ''} processed
+                            </p>
                         </div>
                     )}
 
                     <button
+                        type="button"
                         onClick={handleCreate}
-                        disabled={!isComplete && (creating || !indexName.trim() || videos.length === 0)}
+                        disabled={creating || isComplete || !indexName.trim() || videos.length === 0}
                         className={`w-full py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer
                                    text-gray-900 hover:brightness-95
                                    disabled:opacity-40 disabled:cursor-not-allowed`}
