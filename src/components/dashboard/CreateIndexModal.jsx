@@ -1,6 +1,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Trash2, AlertCircle, Loader2, Check } from 'lucide-react';
+import { X, Upload, Trash2, AlertCircle, Loader2, Check, Info } from 'lucide-react';
 import { upload } from '@vercel/blob/client';
 
 const MIN_DURATION = 4;        // seconds
@@ -27,6 +27,23 @@ function formatDuration(s) {
     const secs = Math.floor(s % 60);
     if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+/** Rough indexing time range string based on total video duration.
+ *  TwelveLabs indexing typically completes in ~30–40% of real-time video length.
+ */
+function formatIndexingEstimateRange(totalSeconds) {
+    if (!totalSeconds || totalSeconds <= 0) return '';
+    const low = totalSeconds * 0.3;
+    const high = totalSeconds * 0.4;
+
+    const toHuman = (s) => {
+        if (s < 60) return `${Math.max(5, Math.round(s / 5) * 5)}s`;
+        const mins = Math.round(s / 60);
+        return `${mins} min`;
+    };
+
+    return `${toHuman(low)}–${toHuman(high)}`;
 }
 
 /** Get duration of a video File via a temporary <video> element */
@@ -155,6 +172,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
     const [statusMessage, setStatusMessage] = useState('');
     const [completed, setCompleted] = useState(0);
     const [isComplete, setIsComplete] = useState(false);
+    const [showIndexingInfo, setShowIndexingInfo] = useState(false);
 
     const fileInputRef = useRef(null);
     const idCounter = useRef(0);
@@ -373,6 +391,9 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
 
     if (!open) return null;
 
+    const totalDurationSeconds = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
+    const estimatedIndexingRange = formatIndexingEstimateRange(totalDurationSeconds);
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Backdrop */}
@@ -502,9 +523,23 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                         {videos.length > 0 && (
                             <div className="mt-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs font-medium text-gray-500">
-                                        {videos.length} video{videos.length !== 1 ? 's' : ''}
-                                    </span>
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs font-medium text-gray-500">
+                                            {videos.length} video{videos.length !== 1 ? 's' : ''}
+                                        </span>
+                                        {estimatedIndexingRange && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowIndexingInfo(true)}
+                                                className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer"
+                                            >
+                                                <Info className="w-3 h-3" strokeWidth={1.5} />
+                                                <span>
+                                                    Est. indexing time: ~{estimatedIndexingRange}
+                                                </span>
+                                            </button>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={clearAll}
                                         disabled={creating}
@@ -556,9 +591,23 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                     }}
                                 />
                             </div>
-                            <p className="text-xs text-gray-400 mt-1.5">
-                                {completed} of {videos.length} video{videos.length !== 1 ? 's' : ''} processed
-                            </p>
+                            <div className="mt-1.5 flex flex-col gap-0.5">
+                                <p className="text-xs text-gray-400">
+                                    {completed} of {videos.length} video{videos.length !== 1 ? 's' : ''} processed
+                                </p>
+                                {estimatedIndexingRange && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowIndexingInfo(true)}
+                                        className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer self-start"
+                                    >
+                                        <Info className="w-3 h-3" strokeWidth={1.5} />
+                                        <span>
+                                            Indexing typically finishes in ~30–40% of video duration (~{estimatedIndexingRange})
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -590,6 +639,54 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                     )}
                 </div>
             </div>
+            {/* Indexing info modal */}
+            {showIndexingInfo && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={() => setShowIndexingInfo(false)}
+                    />
+                    <div className="relative w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl border border-gray-200 p-5">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2">
+                                <Info className="w-4 h-4 text-gray-700" strokeWidth={1.8} />
+                                <h3 className="text-sm font-semibold text-gray-900">
+                                    About indexing time
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowIndexingInfo(false)}
+                                className="p-1 rounded-md hover:bg-gray-100 cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                            Indexing is typically completed in <span className="font-semibold">30–40%</span> of the
+                            duration of the video. However, actual indexing time also depends on the number of{' '}
+                            <span className="font-semibold">concurrent indexing tasks</span>, and delays can occur if
+                            many videos are being indexed at the same time.
+                        </p>
+                        {estimatedIndexingRange && (
+                            <p className="mt-3 text-[11px] text-gray-500">
+                                For this batch, a rough estimate is <span className="font-semibold">{estimatedIndexingRange}</span>{' '}
+                                of total video time, assuming normal queue conditions.
+                            </p>
+                        )}
+                        <div className="mt-4 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowIndexingInfo(false)}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer"
+                            >
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
