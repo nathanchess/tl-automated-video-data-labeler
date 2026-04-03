@@ -680,7 +680,7 @@ export default function IndexDetailPage({ params }) {
                 {/* Header */}
                 <div className="mb-8">
                     <button
-                        onClick={() => router.push('/')}
+                        onClick={() => router.push('/indexes')}
                         className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mb-4 cursor-pointer"
                     >
                         <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />

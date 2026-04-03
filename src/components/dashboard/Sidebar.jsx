@@ -23,8 +23,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const NAV_ITEMS = [
-    { label: 'Overview', icon: Home, href: '/overview' },
-    { label: 'Indexes', icon: Folder, href: '/' },
+    { label: 'Overview', icon: Home, href: '/' },
+    { label: 'Indexes', icon: Folder, href: '/indexes' },
 ];
 
 function NavItem({ label, icon: Icon, active = false, collapsed = false, onClick, href, external }) {
@@ -223,9 +223,10 @@ export default function Sidebar() {
             <nav className="flex-1 mt-2">
                 <ul className="space-y-0.5">
                     {NAV_ITEMS.map((item) => {
-                        const isActive = item.href === '/'
-                            ? pathname === '/'
-                            : pathname.startsWith(item.href);
+                        const isOverview = item.href === '/';
+                        const isActive = isOverview
+                            ? pathname === '/' || pathname === '/overview'
+                            : pathname === '/indexes' || (pathname !== '/' && pathname !== '/overview' && pathname.startsWith('/') && !pathname.startsWith('/api'));
                         return (
                             <NavItem key={item.label} {...item} active={isActive} collapsed={collapsed} />
                         );

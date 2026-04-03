@@ -162,8 +162,9 @@ pm2 save
 ```
 src/
 ├── app/
-│   ├── page.js                    # Home — index grid with dynamic video grouping
-│   ├── overview/page.js           # Blog-style overview with docs & business case
+│   ├── page.js                    # Home — overview (docs & business case)
+│   ├── indexes/page.js            # Indexes — index grid with dynamic video grouping
+│   ├── overview/page.js           # Overview (also accessible at /overview)
 │   ├── [indexName]/page.js        # Index detail — video list, annotation, search
 │   └── api/
 │       ├── videos/route.js        # GET: list videos | POST: upload & index via TwelveLabs
