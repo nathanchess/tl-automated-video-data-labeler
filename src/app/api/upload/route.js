@@ -18,6 +18,7 @@ export async function POST(request) {
                         'video/mpeg',
                         'video/ogg',
                     ],
+                    maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB limit
                     addRandomSuffix: true,
                     tokenPayload: JSON.stringify({}),
                 };

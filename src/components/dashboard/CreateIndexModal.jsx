@@ -287,6 +287,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                     const blob = await upload(v.name, v.file, {
                         access: 'public',
                         handleUploadUrl: '/api/upload',
+                        multipart: true,
                     });
 
                     videoURLs.push(blob.url);
