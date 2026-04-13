@@ -16,7 +16,8 @@
     "pca-js": "^2.0.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "twelvelabs-js": "^1.1.0"
+    "twelvelabs-js": "^1.1.0",
+    "undici": "^6.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

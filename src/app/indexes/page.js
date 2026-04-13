@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import IndexGrid from '@/components/dashboard/IndexGrid';
 import CreateIndexModal from '@/components/dashboard/CreateIndexModal';
+import RateLimitModal from '@/components/dashboard/RateLimitModal';
+import { parseJsonOrThrow } from '@/lib/parseJsonOrThrow';
 
 /** Format seconds → "4h 32m" or "12m" */
 function formatDuration(totalSec) {
@@ -31,25 +33,29 @@ export default function IndexesPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [videos, setVideos] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [rateLimitModalOpen, setRateLimitModalOpen] = useState(false);
 
     // Fetch all videos from API
-    const fetchVideos = async () => {
+    const fetchVideos = useCallback(async () => {
         try {
             setLoading(true);
             const res = await fetch('/api/videos');
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
-            const allVideos = await res.json();
+            const allVideos = await parseJsonOrThrow(res);
             setVideos(allVideos);
         } catch (err) {
-            console.error('Failed to fetch videos:', err);
+            if (err?.isRateLimit) {
+                setRateLimitModalOpen(true);
+            } else {
+                console.error('Failed to fetch videos:', err);
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchVideos();
-    }, []);
+    }, [fetchVideos]);
 
     // Group videos by indexName from user_metadata → derive index objects
     const indexes = useMemo(() => {
@@ -125,6 +131,11 @@ export default function IndexesPage() {
             </main>
 
             <CreateIndexModal open={modalOpen} onClose={() => setModalOpen(false)} onComplete={fetchVideos} />
+
+            <RateLimitModal
+                open={rateLimitModalOpen}
+                onClose={() => setRateLimitModalOpen(false)}
+            />
         </div>
     );
 }

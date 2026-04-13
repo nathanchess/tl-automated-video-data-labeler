@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback, useMemo, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,6 +8,30 @@ import VideoList from '@/components/dashboard/VideoList';
 import CreateIndexModal from '@/components/dashboard/CreateIndexModal';
 import DownloadModal from '@/components/dashboard/DownloadModal';
 import EmbeddingsView from '@/components/dashboard/EmbeddingsView';
+import RateLimitModal from '@/components/dashboard/RateLimitModal';
+import { parseJsonOrThrow } from '@/lib/parseJsonOrThrow';
+
+// ─── Chunked annotation constants ───────────────────────────────────────────
+// Target wall-clock span per analyze call (before slot cap). 600s = 10 minutes.
+// Actual per-call span may be shorter when ceil(span/density) > ANNOTATION_MAX_SLOTS_PER_CALL.
+const ANNOTATION_CHUNK_DURATION = 600;
+const ANNOTATION_MIN_CHUNK_DURATION = 60; // retry floor when chunking fallback is needed
+/** Parallel analyze calls (long-video path). Lower if hitting burst429s. */
+const ANNOTATION_CHUNK_CONCURRENCY = 3;
+
+// TwelveLabs caps output at 4096 tokens. Each annotation object in our schema
+// costs roughly 200-220 tokens (description + timestamps + objects + actions +
+// confidence fields + JSON key overhead). Capping at 12 slots per call keeps
+// the expected output at ~2,600 tokens — well under the limit regardless of
+// how verbose each description is. If you reduce the schema fields you can
+// safely raise this number.
+const ANNOTATION_MAX_SLOTS_PER_CALL = 12;
+
+/** Scene vs action slot step (seconds). Must match densityInstruction + UI hints. */
+const ANNOTATION_SCENE_SLOT_SEC = 30;
+const ANNOTATION_ACTION_SLOT_SEC = 10;
+/** Short clips: shrink slot step so we still get at least this many segments (see slotSec below). */
+const ANNOTATION_MIN_SEGMENTS = 3;
 
 /** Pretty-print seconds → 0:04 / 1:23:45 */
 function formatDuration(s) {
@@ -54,6 +78,16 @@ export default function IndexDetailPage({ params }) {
 
     const [activeTab, setActiveTab] = useState('library');
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+    /** True while /api/videos?embeddings=1 is in flight (Embeddings tab only). */
+    const [embeddingsLoading, setEmbeddingsLoading] = useState(false);
+    /** Avoid repeated embedding fetches if the first attempt returned no vectors. */
+    const autoEmbeddingsFetchRef = useRef(false);
+
+    const [rateLimitModal, setRateLimitModal] = useState({ open: false, partial: null });
+    // partial shape: { videoId, filename, annotationCount, coveredUntil } | null
+    const showRateLimitModal = useCallback((partial = null) => {
+        setRateLimitModal({ open: true, partial });
+    }, []);
 
     const SEARCH_SUGGESTIONS = [
         'People walking or standing',
@@ -83,8 +117,7 @@ export default function IndexDetailPage({ params }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: q, indexName: decodedName }),
             });
-            if (!res.ok) throw new Error(`Search failed: ${res.status}`);
-            const data = await res.json();
+            const data = await parseJsonOrThrow(res);
             // data.results contains search results with videoId, start, end, score
             const results = (data.results || []).map(r => ({
                 id: r.videoId,
@@ -92,12 +125,16 @@ export default function IndexDetailPage({ params }) {
             }));
             setSearchResults(results);
         } catch (err) {
-            console.error('Search error:', err);
-            setSearchResults([]);
+            if (err?.isRateLimit) {
+                showRateLimitModal();
+            } else {
+                console.error('Search error:', err);
+                setSearchResults([]);
+            }
         } finally {
             setSearching(false);
         }
-    }, [search, decodedName]);
+    }, [search, decodedName, showRateLimitModal]);
 
     const clearSearch = useCallback(() => {
         setSearch('');
@@ -182,12 +219,18 @@ export default function IndexDetailPage({ params }) {
         return { manualTimeSec, tlTimeSec, timeSavingsPercent, humanCost, tlCost, costSavingsPercent };
     }, [selectedStats]);
 
-    const fetchVideos = useCallback(async () => {
+    const fetchVideos = useCallback(async (options = {}) => {
+        const { includeEmbeddings = false } = options;
         try {
-            setLoading(true);
-            const res = await fetch('/api/videos');
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
-            const allVideos = await res.json();
+            if (!includeEmbeddings) {
+                autoEmbeddingsFetchRef.current = false;
+                setLoading(true);
+            } else {
+                setEmbeddingsLoading(true);
+            }
+            const qs = includeEmbeddings ? '?embeddings=1' : '';
+            const res = await fetch(`/api/videos${qs}`);
+            const allVideos = await parseJsonOrThrow(res);
 
             const filtered = allVideos.filter((v) => {
                 if (!v.user_metadata) return false;
@@ -210,16 +253,36 @@ export default function IndexDetailPage({ params }) {
 
             setVideos(filtered);
         } catch (err) {
-            console.error('Failed to fetch videos:', err);
-            setError(err.message);
+            if (err?.isRateLimit) {
+                showRateLimitModal();
+                setError(null);
+            } else {
+                console.error('Failed to fetch videos:', err);
+                setError(err.message);
+            }
+            if (includeEmbeddings) autoEmbeddingsFetchRef.current = false;
         } finally {
-            setLoading(false);
+            if (!includeEmbeddings) setLoading(false);
+            else setEmbeddingsLoading(false);
         }
-    }, [decodedName]);
+    }, [decodedName, showRateLimitModal]);
 
     useEffect(() => {
         fetchVideos();
     }, [fetchVideos]);
+
+    // Load Marengo embeddings only when the Embeddings tab is opened (expensive: N TL API calls).
+    useEffect(() => {
+        if (activeTab !== 'embeddings') return;
+        if (videos.length === 0) return;
+        const hasEmb = videos.some(
+            (v) => Array.isArray(v.embeddings) && v.embeddings.length > 0
+        );
+        if (hasEmb) return;
+        if (autoEmbeddingsFetchRef.current) return;
+        autoEmbeddingsFetchRef.current = true;
+        fetchVideos({ includeEmbeddings: true });
+    }, [activeTab, videos, fetchVideos]);
 
     // Build TwelveLabs response_format JSON schema for structured annotations
     const buildAnalyzeSchema = useCallback(() => {
@@ -233,6 +296,7 @@ export default function IndexDetailPage({ params }) {
                         items: {
                             type: "object",
                             properties: {
+                                segment_number: { type: "number" },
                                 start_timestamp: { type: "string" },
                                 end_timestamp: { type: "string" },
                                 description: { type: "string" },
@@ -262,17 +326,27 @@ export default function IndexDetailPage({ params }) {
                                         },
                                         required: ["label", "confidence_score", "start_timestamp", "end_timestamp"]
                                     }
-                                }
+                                },
+                                overall_confidence: { type: "number" },
+                                confidence_score: { type: "number" }
                             },
-                            overall_confidence: { type: "number" },
-                            confidence_score: { type: "number" }
-                        },
-                        required: ["start_timestamp", "end_timestamp", "description", "scene_classification", "detected_objects", "detected_actions", "overall_confidence", "confidence_score"]
+                            required: [
+                                "segment_number",
+                                "start_timestamp",
+                                "end_timestamp",
+                                "description",
+                                "scene_classification",
+                                "detected_objects",
+                                "detected_actions",
+                                "overall_confidence",
+                                "confidence_score"
+                            ]
+                        }
                     }
-                }
-            },
-            required: ["annotations"]
-        }
+                },
+                required: ["annotations"]
+            }
+        };
     }, []);
 
     // Analyze first video for suggested annotation classes (discovery only — simple label list)
@@ -294,8 +368,7 @@ export default function IndexDetailPage({ params }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ videoId, prompt }),
             });
-            if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
-            const result = await res.json();
+            const result = await parseJsonOrThrow(res);
 
             // Parse the response — the model returns JSON inside `data`
             let classes = [];
@@ -312,302 +385,491 @@ export default function IndexDetailPage({ params }) {
             }
             setSuggestedClasses(classes);
         } catch (err) {
-            console.error('Analysis failed:', err);
-            setAnalyzeError(err.message);
+            if (err?.isRateLimit) {
+                showRateLimitModal();
+                // Stop auto-run useEffect from repeatedly calling /api/analyze (null stays "pending").
+                setSuggestedClasses([]);
+            } else {
+                console.error('Analysis failed:', err);
+                setAnalyzeError(err.message);
+            }
         } finally {
             setAnalyzingClasses(false);
         }
-    }, []);
+    }, [showRateLimitModal]);
 
-    // Annotate selected videos — calls analyze API for each, tracks status
+    // Annotate selected videos.
+    // Videos split into ~ANNOTATION_CHUNK_DURATION s windows (then slot-capped); batches run in parallel.
+    // windows so each /api/analyze call stays within the 60 s Vercel Hobby function timeout.
     const annotateVideos = useCallback(async () => {
         const idsToAnnotate = [...selectedIds];
         if (idsToAnnotate.length === 0) return;
 
-        // Immediately uncheck all selections
         setSelectedIds(new Set());
         setAnnotating(true);
 
-        // Set all selected to 'processing'
         setVideoStatuses(prev => {
             const next = { ...prev };
             idsToAnnotate.forEach(id => { next[id] = 'processing'; });
             return next;
         });
 
-        // Build label taxonomy section from user-defined labels
         const labelList = [...domainLabels];
         const taxonomySection = labelList.length > 0
             ? `\nFocus on detecting these specific classes: ${labelList.join(', ')}.`
             : '';
 
-        // Map density selection to prompt instructions
         const densityInstruction = annotationDensity === 'action'
-            ? 'Annotation Density: Action-level — produce many high-frequency annotations (every 2-5 seconds). Cover the ENTIRE video duration with no gaps.'
-            : 'Annotation Density: Scene-level — produce comprehensive scene segments that cover the ENTIRE video duration. Do not leave large gaps between scenes.';
+            ? `Annotation Density: Action-level - produce many high-frequency annotations (every ${ANNOTATION_ACTION_SLOT_SEC} seconds) with no gaps.`
+            : `Annotation Density: Scene-level - produce comprehensive scene segments (about every ${ANNOTATION_SCENE_SLOT_SEC} seconds) with no gaps.`;
 
         const response_format = buildAnalyzeSchema();
 
-        for (const videoId of idsToAnnotate) {
-            // Get video duration
+        // ─── Shared helpers ──────────────────────────────────────────────────
+
+        const toMMSS = (totalSec) => {
+            const s = Math.round(Math.max(0, totalSec));
+            const hrs = Math.floor(s / 3600);
+            const mins = Math.floor((s % 3600) / 60);
+            const secs = s % 60;
+            if (hrs > 0) return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+            return `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        };
+
+        const tsToSec = (ts) => {
+            if (ts == null || ts === '') return 0;
+            const parts = String(ts).split(':').map(Number);
+            if (parts.some(n => Number.isNaN(n))) return 0;
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            return 0;
+        };
+
+        const normTS = (ts) => {
+            if (ts == null) return ts;
+            const str = String(ts).trim();
+            if (/^\d+(\.\d+)?$/.test(str)) return toMMSS(Number(str));
+            return str;
+        };
+
+        /**
+         * Extract all complete annotation objects from a (possibly truncated) JSON string.
+         * Used as a fallback when the top-level parse fails due to a length-truncated response.
+         */
+        const extractPartialAnnotations = (text) => {
+            const results = [];
+            // Match every {...} block that contains at least a start_timestamp key — these are
+            // individual annotation objects. We walk the string to handle nested braces correctly.
+            let i = 0;
+            while (i < text.length) {
+                if (text[i] !== '{') { i++; continue; }
+                let depth = 0;
+                let j = i;
+                while (j < text.length) {
+                    if (text[j] === '{') depth++;
+                    else if (text[j] === '}') { depth--; if (depth === 0) break; }
+                    j++;
+                }
+                if (depth === 0) {
+                    const candidate = text.slice(i, j + 1);
+                    if (candidate.includes('start_timestamp')) {
+                        try {
+                            const obj = JSON.parse(candidate);
+                            if (obj.start_timestamp || obj.description) results.push(obj);
+                        } catch { /* incomplete object — skip */ }
+                    }
+                }
+                i = j + 1;
+            }
+            return results;
+        };
+
+        const parseAnnotations = (result) => {
+            let raw = result?.data;
+            if (!raw) return [];
+            try {
+                if (typeof raw === 'string') {
+                    raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const fb = raw.indexOf('{'); const lb = raw.lastIndexOf('}');
+                    if (fb !== -1 && lb !== -1) raw = raw.substring(fb, lb + 1);
+                    const p = JSON.parse(raw);
+                    if (Array.isArray(p.annotations)) return p.annotations;
+                    if (Array.isArray(p.scene_annotations)) return p.scene_annotations;
+                    if (p.scene) return [p.scene];
+                    if (Array.isArray(p.scenes)) return p.scenes;
+                    if (Array.isArray(p)) return p;
+                    if (p.detected_objects || p.detected_actions || p.description) return [p];
+                    return [];
+                } else {
+                    const d = raw;
+                    if (Array.isArray(d?.annotations)) return d.annotations;
+                    if (Array.isArray(d?.scene_annotations)) return d.scene_annotations;
+                    if (d?.scene) return [d.scene];
+                    if (Array.isArray(d)) return d;
+                    return [];
+                }
+            } catch {
+                // Full-parse failed — try to salvage complete objects from a truncated response.
+                try {
+                    const text = typeof result?.data === 'string' ? result.data : JSON.stringify(result?.data ?? '');
+                    // First try the outermost wrapper object
+                    const m = text.match(/\{[\s\S]*\}/);
+                    if (m) {
+                        try {
+                            const p = JSON.parse(m[0]);
+                            if (Array.isArray(p.annotations)) return p.annotations;
+                            if (Array.isArray(p.scene_annotations)) return p.scene_annotations;
+                        } catch { /* still truncated — fall through */ }
+                    }
+                    // Walk the string and pull out every complete annotation object
+                    const partial = extractPartialAnnotations(text);
+                    if (partial.length > 0) return partial;
+                } catch { /* ignore */ }
+                return [];
+            }
+        };
+
+        const postProcess = (anns) => {
+            if (!anns?.length) return anns || [];
+            return anns.map(ann => {
+                const origDesc = ann.description || '';
+
+                const extractList = (regex) => {
+                    const match = origDesc.match(regex);
+                    if (!match) return [];
+                    const items = [];
+                    for (const m of match[1].matchAll(/-\s*(.+?)\s*\(confidence_score:\s*([\d.]+)\)/gi))
+                        items.push({ label: m[1].trim(), confidence_score: parseFloat(m[2]) });
+                    return items;
+                };
+
+                if (!ann.detected_objects?.length && origDesc.includes('detected_objects:')) {
+                    const ex = extractList(/detected_objects:\s*([\s\S]*?)(?=- detected_actions:|- overall_confidence:|$)/i);
+                    if (ex.length) ann.detected_objects = ex;
+                }
+                if (!ann.detected_actions?.length && origDesc.includes('detected_actions:')) {
+                    const ex = extractList(/detected_actions:\s*([\s\S]*?)(?=- overall_confidence:|$)/i);
+                    if (ex.length) ann.detected_actions = ex;
+                }
+                if (!ann.scene_classification && origDesc.includes('scene_classification:')) {
+                    const m = origDesc.match(/scene_classification:\s*(.+?)(?=\s*- detected_|$)/i);
+                    if (m) ann.scene_classification = m[1].trim();
+                }
+                if (ann.overall_confidence == null && origDesc.includes('overall_confidence:')) {
+                    const m = origDesc.match(/overall_confidence:\s*([\d.]+)/i);
+                    if (m) ann.overall_confidence = parseFloat(m[1]);
+                }
+                if (ann.confidence_score == null && origDesc.includes('confidence_score:')) {
+                    const m = origDesc.match(/confidence_score:\s*([\d.]+)/i);
+                    if (m) ann.confidence_score = parseFloat(m[1]);
+                }
+
+                const desc = ann.description || '';
+                if (desc.includes('scene_classification:') || desc.includes('detected_objects:')) {
+                    const sps = ['- scene_classification:', '- detected_objects:', 'scene_classification:', 'detected_objects:', 'confidence_score:', 'overall_confidence:'];
+                    let minIdx = desc.length;
+                    sps.forEach(sp => { const i = desc.indexOf(sp); if (i !== -1 && i < minIdx) minIdx = i; });
+                    if (minIdx < desc.length) ann.description = desc.substring(0, minIdx).trim();
+                }
+
+                ann.start_timestamp = normTS(ann.start_timestamp);
+                ann.end_timestamp = normTS(ann.end_timestamp);
+                if (ann.start_timestamp && !ann.timestamp) ann.timestamp = ann.start_timestamp;
+
+                const unifyTag = (item) => {
+                    const text = item.label || item.object || item.action || item.name || '';
+                    const out = { ...item, label: item.label || text, name: item.name || text };
+                    if (out.start_timestamp) out.start_timestamp = normTS(out.start_timestamp);
+                    if (out.end_timestamp) out.end_timestamp = normTS(out.end_timestamp);
+                    return out;
+                };
+                if (Array.isArray(ann.detected_objects)) ann.detected_objects = ann.detected_objects.map(unifyTag);
+                if (Array.isArray(ann.detected_actions)) ann.detected_actions = ann.detected_actions.map(unifyTag);
+
+                return ann;
+            });
+        };
+
+        // One /api/analyze call. Always returns { annotations, lengthTruncated } (no fragile array props).
+        const callChunk = async (videoId, chunkPrompt, rf, startSec, endSec) => {
+            const body = { videoId, prompt: chunkPrompt, response_format: rf };
+            if (startSec != null) body.startSec = Math.floor(startSec);
+            if (endSec != null) body.endSec = Math.ceil(endSec);
+            const res = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const result = await parseJsonOrThrow(res);
+
+            if (result?.finishReason === 'length') {
+                const salvaged = postProcess(parseAnnotations(result));
+                if (salvaged.length > 0) {
+                    console.warn(
+                        `[annotate] finishReason=length for window ${startSec ?? 0}-${endSec ?? '?'}; ` +
+                        `salvaged ${salvaged.length} annotation(s) from partial response. ` +
+                        `Consider reducing chunk size or annotation density to stay under the token limit.`
+                    );
+                    return { annotations: salvaged, lengthTruncated: false };
+                }
+                console.warn(
+                    `[annotate] finishReason=length AND no salvageable annotations for window ` +
+                    `${startSec ?? 0}-${endSec ?? '?'}. Will use fallback annotation.`
+                );
+                return { annotations: [], lengthTruncated: true };
+            }
+
+            return { annotations: postProcess(parseAnnotations(result)), lengthTruncated: false };
+        };
+
+        const buildFallbackAnnotation = (startSec, endSec) => {
+            const safeStart = Math.max(0, Math.floor(startSec ?? 0));
+            const safeEnd = Math.max(safeStart + 1, Math.ceil(endSec ?? safeStart + 1));
+            return {
+                start_timestamp: toMMSS(safeStart),
+                end_timestamp: toMMSS(safeEnd),
+                timestamp: toMMSS(safeStart),
+                description: `Fallback annotation for ${toMMSS(safeStart)}-${toMMSS(safeEnd)} because model returned no segments.`,
+                scene_classification: 'fallback',
+                detected_objects: [
+                    {
+                        label: 'unspecified object',
+                        name: 'unspecified object',
+                        confidence_score: 0.3,
+                        start_timestamp: toMMSS(safeStart),
+                        end_timestamp: toMMSS(safeEnd),
+                    },
+                ],
+                detected_actions: [
+                    {
+                        label: 'unspecified action',
+                        name: 'unspecified action',
+                        confidence_score: 0.3,
+                        start_timestamp: toMMSS(safeStart),
+                        end_timestamp: toMMSS(safeEnd),
+                    },
+                ],
+                confidence_score: 0.3,
+                overall_confidence: 0.3,
+            };
+        };
+
+        // ─── Per-video annotation loop ────────────────────────────────────────
+
+        function generateTimeSlots(chunkStart, chunkEnd, slotDuration = 30) {
+            const slots = [];
+            let cursor = chunkStart;
+            while (cursor < chunkEnd) {
+                slots.push({
+                    start: toMMSS(cursor),
+                    end: toMMSS(Math.min(cursor + slotDuration, chunkEnd)),
+                });
+                cursor += slotDuration;
+            }
+            return slots;
+        }
+
+        /** Next chunk boundary: ANNOTATION_CHUNK_DURATION cap + ANNOTATION_MAX_SLOTS_PER_CALL. */
+        function computeNextChunkEnd(chunkStart, durationSec, slotSec) {
+            const remaining = durationSec - chunkStart;
+            if (remaining <= 0) return chunkStart;
+            const rawChunk = Math.min(ANNOTATION_CHUNK_DURATION, remaining);
+            const slotsInChunk = Math.min(
+                Math.ceil(rawChunk / slotSec),
+                ANNOTATION_MAX_SLOTS_PER_CALL
+            );
+            const spanSeconds = Math.min(rawChunk, slotsInChunk * slotSec);
+            return Math.min(durationSec, chunkStart + spanSeconds);
+        }
+
+        annotateLoop: for (const videoId of idsToAnnotate) {
             const video = videos.find(v => v._id === videoId || v.id === videoId);
             const duration = video?.systemMetadata?.duration || 0;
-            const durationText = duration ? `The video is ${Math.ceil(duration)} seconds long.` : '';
 
-            const prompt = `You are a Computer Vision Data Generation Engine. 
-        Your task is to generate a structured training dataset for an Object Detection model.
-        ${taxonomySection}. If no analyze the video first to generate a list of classes to use and then use those classes to generate the annotations.
-        ${densityInstruction}
-        ${durationText}
+            const baseSlotSec = annotationDensity === 'action'
+                ? ANNOTATION_ACTION_SLOT_SEC
+                : ANNOTATION_SCENE_SLOT_SEC;
+            const slotSec =
+                duration > 0
+                    ? Math.min(baseSlotSec, duration / ANNOTATION_MIN_SEGMENTS)
+                    : baseSlotSec;
 
-        Must include at least one object and one action per annotation.
-        Must include at least 3 annotations per video. They should be spread out across the video and have variable durations.
-        
-        CRITICAL INSTRUCTIONS FOR JSON OUTPUT:
-        1. **Populate Arrays**: You MUST put object and action details into the 'detected_objects' and 'detected_actions' arrays. 
-        2. **Precise Timestamps**: 
-           - The 'detected_objects' and 'detected_actions' items MUST have their own 'start_timestamp' and 'end_timestamp' which can trigger *within* the scene.
-           - Example: Scene is 00:00-00:10. Object 'car' is visible 00:02-00:05. record 00:02-00:05 for the object.
-        3. **Atomic Events**: If an object changes state (e.g. from "driving" to "stopped"), create a new annotation segment or distinct action entry.
-        4. **No Overlapping Annotations**: Ensure that no two **scene-level** annotations overlap in time. Each scene has one continuous time range; ranges must form a partition from 00:00 to the end.
-        5. **Full Coverage (no gaps)**: The union of all scene segments must cover **every second** from 00:00 through the full video duration (~${Math.ceil(duration)}s). After sorting scenes by start time: the first scene must start at 00:00; each following scene must start exactly when the previous scene ends; the last scene must end at the video’s end time. Do not leave uncovered gaps (e.g. missing minutes) between scenes.
-        6. **Segment timestamps**: Each scene object in your output must include explicit \`start_timestamp\` and \`end_timestamp\` for the **whole scene** (the full span that scene describes), not only on child items. Child objects/actions still get their own finer timestamps inside that span.
-        7. **First Person Perspective**: Ensure that the annotations are from the first person perspective. This means that the annotations should be from the point of view of the camera and DO NOT reference the camera, angles changing, lighting, etc. It should focus on the context and video content, not how it was created.
+            const baseInstructions = `You are a Computer Vision Data Generation Engine.
+            Your task is to generate a structured training dataset for an Object Detection model.
+            ${taxonomySection}. If no taxonomy provided, determine classes from the video content first.
+            ${densityInstruction}
+            Total video duration: ${Math.ceil(duration)} seconds.
+            Segment time bins in each prompt use ~${Number(slotSec.toFixed(2))}s steps (capped from ~${baseSlotSec}s default for short clips).
 
-        For each annotation segment, structure the data exactly as defined in the schema:
-        - description: Description of the scene, audio, and events seen within that time frame of the video.
-        - scene_classification: comma-separated tags.
-        - detected_objects: ARRAY of objects.
-        - detected_actions: ARRAY of actions.
-        - confidence_score: A number between 0 and 1 indicating how confident you are in this specific annotation segment.
-        - overall_confidence: A number between 0 and 1 indicating the overall quality and confidence of the entire set of annotations for this video (should be consistent across all segments).
-        
-        `;
+            CRITICAL INSTRUCTIONS:
+            1. Populate 'detected_objects' and 'detected_actions' arrays with items.
+            2. Objects/actions MUST have their own start_timestamp and end_timestamp. These timestamps should be as precise as possible and DO NOT have to match the segment timestamps. They should be exactly when the object/action starts and ends within the segmnet, not the segment timestamp itself.
+            3. Each scene MUST have explicit start_timestamp and end_timestamp for the whole scene.
+            4. Scene-level annotations must not overlap in time.
+            5. ALL timestamps MUST be 'MM:SS' or 'HH:MM:SS' strings (e.g. '01:23'). Never raw seconds.
+            6. All timestamps are absolute from 00:00 of the full video.
 
+            CONCISENESS RULES (important — do not exceed these limits):
+            - description: 1 sentence, max 20 words.
+            - detected_objects: top 3 most prominent only.
+            - detected_actions: top 2 most prominent only.
+
+            TEMPORAL PRECISION (objects & actions — required):
+            - For each item in detected_objects and detected_actions, set start_timestamp and end_timestamp to the
+            narrowest interval YOU CAN INFER for when that specific object is clearly visible or that action is clearly
+            happening INSIDE this segment’s [start_timestamp, end_timestamp] window.
+            - Do NOT copy the scene’s start/end for every item by default. Full-span timestamps are ONLY allowed when
+            that object/action is genuinely present or ongoing for essentially the entire segment.
+            - If something appears only in part of the segment (e.g. enters mid-segment, leaves early, or a short motion),
+            the timestamps MUST reflect that sub-interval (e.g. 00:18–00:22), fully inside the segment bounds.
+            - If you are uncertain, prefer a shorter plausible window over spanning the whole segment; never stretch an
+            interval beyond what the video supports.
+            - All timestamps remain MM:SS or HH:MM:SS and must stay within this segment’s time range.
+
+            For each annotation segment output:
+            - description: What is seen/heard in this time range. This should include distinct summaries / detail on conversation dialogue if any is present and key topics said from specific people with their names.
+            - scene_classification: comma-separated tags.
+            - detected_objects: ARRAY of top 3 objects with start_timestamp, end_timestamp.
+            - detected_actions: ARRAY of top 2 actions with start_timestamp, end_timestamp.
+            - confidence_score: 0-1 confidence for this segment.
+            - overall_confidence: 0-1 overall quality (consistent across all segments).
+            
+            Ensure to keep your entire output under 4096 tokens.
+            
+            `;
+
+            let annotations = [];
             try {
-                const res = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ videoId, prompt, response_format }),
-                });
-                if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
-                const result = await res.json();
 
-                // Parse annotations — try JSON first, then plain text
-                let annotations = [];
-                try {
-                    let rawData = result.data;
-                    if (typeof rawData === 'string') {
-                        // Strip markdown code blocks if present
-                        rawData = rawData.replace(/```json/g, '').replace(/```/g, '').trim();
-                        // Find the first '{' and last '}' to handle potential prologue/epilogue text
-                        const firstBrace = rawData.indexOf('{');
-                        const lastBrace = rawData.lastIndexOf('}');
-                        if (firstBrace !== -1 && lastBrace !== -1) {
-                            rawData = rawData.substring(firstBrace, lastBrace + 1);
-                        }
-                        const parsed = JSON.parse(rawData);
+                const runOneAnalyzeWindow = async (chunkStart, chunkEnd) => {
+                    const windowStart = toMMSS(chunkStart);
+                    const windowEnd = toMMSS(chunkEnd);
+                    const slots = generateTimeSlots(chunkStart, chunkEnd, slotSec);
+                    const slotPrompts = slots.map((slot, slotIndex) =>
+                        `[Segment ${slotIndex + 1} - ${slot.start} to ${slot.end}]`
+                    );
+                    const chunkPrompt = `[WINDOW ${windowStart} to ${windowEnd}]
+ Annotate ONLY the portion of this video from ${windowStart} to ${windowEnd}.
 
-                        // Handle various potential output structures
-                        if (parsed.annotations && Array.isArray(parsed.annotations)) {
-                            annotations = parsed.annotations;
-                        } else if (parsed.scene_annotations && Array.isArray(parsed.scene_annotations)) {
-                            annotations = parsed.scene_annotations;
-                        } else if (parsed.scene) {
-                            // Single scene object
-                            annotations = [parsed.scene];
-                        } else if (parsed.scenes && Array.isArray(parsed.scenes)) {
-                            annotations = parsed.scenes;
-                        } else if (Array.isArray(parsed)) {
-                            annotations = parsed;
-                        } else if (parsed.detected_objects || parsed.detected_actions || parsed.description) {
-                            // Root object is likely the scene itself
-                            annotations = [parsed];
-                        } else {
-                            annotations = [];
-                        }
-                    } else {
-                        // Fallback for non-string rawData (already parsed JSON?)
-                        const d = rawData;
-                        if (d?.annotations) annotations = d.annotations;
-                        else if (d?.scene_annotations && Array.isArray(d.scene_annotations)) annotations = d.scene_annotations;
-                        else if (d?.scene) annotations = [d.scene];
-                        else if (Array.isArray(d)) annotations = d;
-                        else annotations = [];
+                            You MUST produce exactly ${slots.length} annotations with segment_number 1 through ${slots.length}, one for each time range:
+
+                            ${slotPrompts.join('\n')}
+
+                            For EACH segment: set segment_number to match the number above, set start_timestamp and end_timestamp to match the times above.
+                            If a segment looks similar to the previous one, still produce a separate annotation describing the current state.
+                            Do NOT combine segments. Do NOT skip segments.
+
+                            ${baseInstructions}`;
+
+                    let { annotations: chunkAnns, lengthTruncated } = await callChunk(
+                        videoId,
+                        chunkPrompt,
+                        response_format,
+                        chunkStart,
+                        chunkEnd
+                    );
+                    if (chunkAnns.length === 0 && !lengthTruncated) {
+                        const enforcePrompt = `${chunkPrompt}
+
+                                    FINAL REQUIREMENT:
+                                    - Return at least ONE annotation segment.
+                                    - If uncertain, return one single segment that spans exactly ${windowStart} to ${windowEnd}.`;
+                        ({ annotations: chunkAnns, lengthTruncated } = await callChunk(
+                            videoId,
+                            enforcePrompt,
+                            response_format,
+                            chunkStart,
+                            chunkEnd
+                        ));
                     }
-                } catch (e) {
-                    console.error("JSON Parse failed", e);
-                    // Try to find embedded JSON with regex as last resort
-                    try {
-                        const text = typeof result.data === 'string' ? result.data : JSON.stringify(result.data);
-                        const jsonMatch = text.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            const parsed = JSON.parse(jsonMatch[0]);
-                            if (Array.isArray(parsed.annotations)) annotations = parsed.annotations;
-                            else if (Array.isArray(parsed.scene_annotations)) annotations = parsed.scene_annotations;
-                            else annotations = [];
-                        }
-                    } catch { /* not JSON either */ }
-                }
+                    if (chunkAnns.length === 0) {
+                        console.warn(`[annotate] window ${windowStart}->${windowEnd} still empty; injecting fallback segment.`);
+                        chunkAnns = [buildFallbackAnnotation(chunkStart, chunkEnd)];
+                    }
+                    return chunkAnns;
+                };
 
-                // Post-process annotations to fix missing fields if stuck in description
-                if (annotations.length > 0) {
-                    annotations = annotations.map(ann => {
-                        let desc = ann.description || '';
-                        const originalDesc = desc;
-
-                        // Helper to extract list from text if JSON is empty
-                        const extractList = (regex) => {
-                            const match = originalDesc.match(regex);
-                            if (!match) return [];
-                            const items = [];
-                            const matches = match[1].matchAll(/-\s*(.+?)\s*\(confidence_score:\s*([\d.]+)\)/gi);
-                            for (const m of matches) {
-                                items.push({ label: m[1].trim(), confidence_score: parseFloat(m[2]) });
-                            }
-                            return items;
-                        };
-
-                        // Fix detected_objects
-                        if ((!ann.detected_objects || ann.detected_objects.length === 0) && originalDesc.includes('detected_objects:')) {
-                            const extracted = extractList(/detected_objects:\s*([\s\S]*?)(?=- detected_actions:|- overall_confidence:|$)/i);
-                            if (extracted.length > 0) ann.detected_objects = extracted;
-                        }
-
-                        // Fix detected_actions
-                        if ((!ann.detected_actions || ann.detected_actions.length === 0) && originalDesc.includes('detected_actions:')) {
-                            const extracted = extractList(/detected_actions:\s*([\s\S]*?)(?=- overall_confidence:|$)/i);
-                            if (extracted.length > 0) ann.detected_actions = extracted;
-                        }
-
-                        // Fix scene_classification
-                        if (!ann.scene_classification && originalDesc.includes('scene_classification:')) {
-                            const match = originalDesc.match(/scene_classification:\s*(.+?)(?=\s*- detected_|$)/i);
-                            if (match) ann.scene_classification = match[1].trim();
-                        }
-
-                        // Fix overall_confidence
-                        if (ann.overall_confidence == null && originalDesc.includes('overall_confidence:')) {
-                            const match = originalDesc.match(/overall_confidence:\s*([\d.]+)/i);
-                            if (match) ann.overall_confidence = parseFloat(match[1]);
-                        }
-
-                        // Fix confidence_score extraction if missing but present in text
-                        if (ann.confidence_score == null && originalDesc.includes('confidence_score:')) {
-                            const match = originalDesc.match(/confidence_score:\s*([\d.]+)/i);
-                            if (match) ann.confidence_score = parseFloat(match[1]);
-                        }
-
-                        // Clean description matching the extracted parts
-                        if (desc.includes('scene_classification:') || desc.includes('detected_objects:')) {
-                            // Keep only the part before the structured block starts
-                            const splitPoints = ['- scene_classification:', '- detected_objects:', 'scene_classification:', 'detected_objects:', 'confidence_score:', 'overall_confidence:'];
-                            let minIndex = desc.length;
-                            splitPoints.forEach(sp => {
-                                const idx = desc.indexOf(sp);
-                                if (idx !== -1 && idx < minIndex) minIndex = idx;
-                            });
-                            if (minIndex < desc.length) {
-                                ann.description = desc.substring(0, minIndex).trim();
+                /** Sequential [wStart,wEnd) with halving retry (same chunkStart until success). */
+                const runWindowPartition = async (wStart, wEnd) => {
+                    const local = [];
+                    let chunkStart = wStart;
+                    while (chunkStart < wEnd) {
+                        let chunkSize = wEnd - chunkStart;
+                        let chunkDone = false;
+                        while (!chunkDone) {
+                            const chunkEnd = Math.min(chunkStart + chunkSize, wEnd);
+                            const windowStart = toMMSS(chunkStart);
+                            const windowEnd = toMMSS(chunkEnd);
+                            console.log(
+                                `[annotate] ${windowStart}->${windowEnd} (${Math.round(chunkEnd - chunkStart)}s try, videoId=${videoId})`
+                            );
+                            try {
+                                const chunkAnns = await runOneAnalyzeWindow(chunkStart, chunkEnd);
+                                local.push(...chunkAnns);
+                                chunkStart = chunkEnd;
+                                chunkDone = true;
+                            } catch (chunkErr) {
+                                if (chunkErr?.isRateLimit) throw chunkErr;
+                                if (chunkSize <= ANNOTATION_MIN_CHUNK_DURATION) {
+                                    throw chunkErr;
+                                }
+                                chunkSize = Math.max(
+                                    ANNOTATION_MIN_CHUNK_DURATION,
+                                    Math.floor(chunkSize / 2)
+                                );
+                                console.warn(
+                                    `[annotate] window failed ${windowStart}->${windowEnd}. Retrying with smaller slice (${chunkSize}s).`,
+                                    chunkErr
+                                );
                             }
                         }
+                    }
+                    return local;
+                };
 
-
-                        // Normalize timestamps
-                        if (ann.start_timestamp && !ann.timestamp) ann.timestamp = ann.start_timestamp;
-
-                        // Unify label/name on child items (API often returns `name` only)
-                        const unifyTag = (item) => {
-                            const text = item.label || item.object || item.action || item.name;
-                            if (text == null || text === '') return item;
-                            return {
-                                ...item,
-                                label: item.label || text,
-                                name: item.name || text,
-                            };
-                        };
-                        if (Array.isArray(ann.detected_objects)) {
-                            ann.detected_objects = ann.detected_objects.map(unifyTag);
-                        }
-                        if (Array.isArray(ann.detected_actions)) {
-                            ann.detected_actions = ann.detected_actions.map(unifyTag);
-                        }
-
-                        return ann;
-                    });
+                const windows = [];
+                let c = 0;
+                while (c < duration) {
+                    const e = computeNextChunkEnd(c, duration, slotSec);
+                    if (e <= c) break;
+                    windows.push([c, e]);
+                    c = e;
                 }
 
-                // Calculate overall video confidence for status
-                // Priority: 1. explicit overall_confidence field on first annotation (if global)
-                //           2. average of individual segment confidence_scores
-                //           3. default fallback
+                for (let i = 0; i < windows.length; i += ANNOTATION_CHUNK_CONCURRENCY) {
+                    const batch = windows.slice(i, i + ANNOTATION_CHUNK_CONCURRENCY);
+                    const settled = await Promise.allSettled(
+                        batch.map(([s, e]) => runWindowPartition(s, e))
+                    );
+                    let firstError = null;
+                    for (const result of settled) {
+                        if (result.status === 'fulfilled') {
+                            annotations.push(...result.value);
+                        } else if (!firstError) {
+                            firstError = result.reason;
+                        }
+                    }
+                    if (firstError) throw firstError;
+                }
+
+                annotations.sort((a, b) => tsToSec(a.start_timestamp) - tsToSec(b.start_timestamp));
+                annotations.forEach((ann, i) => {
+                    ann.segment_number = i + 1;
+                });
+
+                // Confidence & status
                 let avgConfidence = 0;
                 const scores = annotations.map(a => a.confidence_score || a.overall_confidence).filter(s => s != null);
-                if (scores.length > 0) {
-                    avgConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
-                } else if (annotations.length > 0 && annotations[0].overall_confidence != null) {
-                    avgConfidence = annotations[0].overall_confidence;
-                }
+                if (scores.length > 0) avgConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
+                else if (annotations[0]?.overall_confidence != null) avgConfidence = annotations[0].overall_confidence;
 
-                // Determine status based on confidence
                 const status = avgConfidence >= 0.7 ? 'ready' : 'needs_review';
-
-                // Update UI status immediately
                 setVideoStatuses(prev => ({ ...prev, [videoId]: status }));
 
-                // Fallback: parse plain text format from the API if JSON completely failed
-                if (annotations.length === 0 && typeof result.data === 'string') {
-                    const text = result.data;
-                    // Split on "Timestamp:" blocks
-                    const blocks = text.split(/(?=Start:|Timestamp:|Time:)/i).filter(b => b.trim().length > 10);
-
-                    for (const block of blocks) {
-                        const startMatch = block.match(/(?:Start matches|Start|Timestamp|Time):\s*(\d+:\d+)/i);
-                        const endMatch = block.match(/(?:End|To):\s*(\d+:\d+)/i);
-                        const descMatch = block.match(/Description:\s*([\s\S]*?)(?=\nScene Classification:|$)/i);
-                        const sceneMatch = block.match(/Scene Classification:\s*(.*)/i);
-                        const overallMatch = block.match(/Overall Confidence:\s*([\d.]+)/i);
-
-                        // Extract detected objects
-                        const objSection = block.match(/Detected Objects:\s*([\s\S]*?)(?=Detected Actions:|Overall Confidence:|Timestamp:|$)/i);
-                        const detected_objects = [];
-                        if (objSection) {
-                            const items = objSection[1].matchAll(/-\s*(.+?)\s*\(confidence_score:\s*([\d.]+)\)/gi);
-                            for (const m of items) {
-                                detected_objects.push({ label: m[1].trim(), confidence_score: parseFloat(m[2]) });
-                            }
-                        }
-
-                        // Extract detected actions
-                        const actSection = block.match(/Detected Actions:\s*([\s\S]*?)(?=Overall Confidence:|Timestamp:|$)/i);
-                        const detected_actions = [];
-                        if (actSection) {
-                            const items = actSection[1].matchAll(/-\s*(.+?)\s*\(confidence_score:\s*([\d.]+)\)/gi);
-                            for (const m of items) {
-                                detected_actions.push({ label: m[1].trim(), confidence_score: parseFloat(m[2]) });
-                            }
-                        }
-
-                        if (startMatch) {
-                            annotations.push({
-                                timestamp: startMatch[1],
-                                start_timestamp: startMatch[1],
-                                end_timestamp: endMatch ? endMatch[1] : startMatch[1], // fallback end=start
-                                description: descMatch ? descMatch[1].trim() : '',
-                                scene_classification: sceneMatch ? sceneMatch[1].trim() : '',
-                                detected_objects,
-                                detected_actions,
-                                overall_confidence: overallMatch ? parseFloat(overallMatch[1]) : null,
-                            });
-                        }
-                    }
-                }
-
-                // Store annotation results in state and localStorage
+                // Persist
                 setAnnotationResults(prev => ({ ...prev, [videoId]: annotations }));
 
-                // Find filename for this video to build localStorage key
-                const videoObj = videos.find(v => v.id === videoId);
+                const videoObj = videos.find(v => v._id === videoId || v.id === videoId);
                 const filename = videoObj?.systemMetadata?.filename || videoId;
                 const storageKey = `annotations_${decodedName}_${filename}`;
                 try {
@@ -619,20 +881,58 @@ export default function IndexDetailPage({ params }) {
                         annotatedAt: new Date().toISOString(),
                         hls: videoObj?.hls,
                         systemMetadata: videoObj?.systemMetadata,
-                        avgConfidence // Save this so we don't have to recalc on load if we don't want to
+                        avgConfidence,
                     }));
                 } catch (e) {
                     console.warn('Failed to save annotations to localStorage:', e);
                 }
 
             } catch (err) {
+                if (err?.isRateLimit) {
+                    // Save whatever chunks completed for this video before stopping.
+                    let partialContext = null;
+                    if (annotations.length > 0) {
+                        const videoObj = videos.find(v => v._id === videoId || v.id === videoId);
+                        const filename = videoObj?.systemMetadata?.filename || videoId;
+                        const storageKey = `annotations_${decodedName}_${filename}`;
+                        const lastAnn = annotations[annotations.length - 1];
+                        const coveredUntil = lastAnn?.end_timestamp ?? null;
+                        try {
+                            localStorage.setItem(storageKey, JSON.stringify({
+                                videoId,
+                                indexName: decodedName,
+                                filename,
+                                annotations,
+                                partial: true,
+                                annotatedAt: new Date().toISOString(),
+                                hls: videoObj?.hls,
+                                systemMetadata: videoObj?.systemMetadata,
+                                avgConfidence: 0,
+                            }));
+                        } catch (e) {
+                            console.warn('Failed to save partial annotations to localStorage:', e);
+                        }
+                        setAnnotationResults(prev => ({ ...prev, [videoId]: annotations }));
+                        setVideoStatuses(prev => ({ ...prev, [videoId]: 'needs_review' }));
+                        partialContext = { videoId, filename, annotationCount: annotations.length, coveredUntil };
+                    }
+                    setVideoStatuses((prev) => {
+                        const next = { ...prev };
+                        idsToAnnotate.forEach((id) => {
+                            if (next[id] === 'processing') next[id] = 'needs_review';
+                        });
+                        return next;
+                    });
+                    showRateLimitModal(partialContext);
+                    break annotateLoop;
+                }
                 console.error(`Annotation failed for ${videoId}:`, err);
                 setVideoStatuses(prev => ({ ...prev, [videoId]: 'needs_review' }));
             }
         }
 
         setAnnotating(false);
-    }, [selectedIds, domainLabels, annotationDensity, buildAnalyzeSchema, videos, decodedName]);
+    }, [selectedIds, domainLabels, annotationDensity, buildAnalyzeSchema, videos, decodedName, showRateLimitModal]);
 
     // Restore annotation statuses from localStorage when videos load
     useEffect(() => {
@@ -665,9 +965,9 @@ export default function IndexDetailPage({ params }) {
         }
     }, [videos, decodedName]);
 
-    // Trigger analysis once videos are loaded
+    // Trigger analysis once videos are loaded (only while still "unset" — null, not []).
     useEffect(() => {
-        if (videos.length > 0 && !suggestedClasses && !analyzingClasses) {
+        if (videos.length > 0 && suggestedClasses === null && !analyzingClasses) {
             runAnalysis(videos[0].id);
         }
     }, [videos, suggestedClasses, analyzingClasses, runAnalysis]);
@@ -1031,7 +1331,7 @@ export default function IndexDetailPage({ params }) {
 
                 {/* Embeddings Tab Content */}
                 {activeTab === 'embeddings' && (
-                    <EmbeddingsView videos={videos} />
+                    <EmbeddingsView videos={videos} isFetchingEmbeddings={embeddingsLoading} />
                 )}
             </main>
 
@@ -1055,7 +1355,7 @@ export default function IndexDetailPage({ params }) {
                                             }`}
                                     >
                                         Scene-level
-                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">10-30s</span>
+                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">~{ANNOTATION_SCENE_SLOT_SEC}s bins</span>
                                     </button>
                                     <button
                                         onClick={() => setAnnotationDensity('action')}
@@ -1065,7 +1365,7 @@ export default function IndexDetailPage({ params }) {
                                             }`}
                                     >
                                         Action-level
-                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">2-5s</span>
+                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">~{ANNOTATION_ACTION_SLOT_SEC}s bins</span>
                                     </button>
                                 </div>
                             </div>
@@ -1154,6 +1454,12 @@ export default function IndexDetailPage({ params }) {
             />
 
             {/* Download modal */}
+            <RateLimitModal
+                open={rateLimitModal.open}
+                partial={rateLimitModal.partial}
+                onClose={() => setRateLimitModal({ open: false, partial: null })}
+            />
+
             <DownloadModal
                 isOpen={downloadModalOpen}
                 onClose={() => setDownloadModalOpen(false)}

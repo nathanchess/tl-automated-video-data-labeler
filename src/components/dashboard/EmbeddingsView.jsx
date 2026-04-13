@@ -5,7 +5,7 @@ import { Search, ZoomIn, ZoomOut, Maximize, Play, Clock, FileText, Loader2, X, S
 const POINT_SIZE = 16;
 const HOVER_SCALE = 2;
 
-export default function EmbeddingsView({ videos }) {
+export default function EmbeddingsView({ videos, isFetchingEmbeddings = false }) {
     const [points, setPoints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
@@ -272,9 +272,14 @@ export default function EmbeddingsView({ videos }) {
                 </div>
 
                 {/* Error/Loading */}
-                {loading && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm">
+                {(loading || isFetchingEmbeddings) && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/50 dark:bg-black/50 backdrop-blur-sm px-6 text-center">
                         <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                        {isFetchingEmbeddings && (
+                            <p className="text-xs text-[var(--text-secondary)] max-w-sm">
+                                Fetching Marengo embeddings from TwelveLabs (one request per video). This only runs when you open this tab.
+                            </p>
+                        )}
                     </div>
                 )}
                 {error && (

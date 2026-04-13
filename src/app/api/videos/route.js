@@ -1,4 +1,4 @@
-import { TwelveLabs } from "twelvelabs-js"
+import { TwelveLabs, TwelvelabsApiError } from "twelvelabs-js"
 import { NextResponse } from "next/server"
 
 const tl_client = new TwelveLabs({
@@ -6,75 +6,98 @@ const tl_client = new TwelveLabs({
 })
 
 export async function GET(request) {
+    try {
+        // Per-video embedding retrieval is expensive (N TwelveLabs API calls).
+        // Default: list only. Use ?embeddings=1 when opening the Embeddings tab.
+        const { searchParams } = new URL(request.url)
+        const includeEmbeddings =
+            searchParams.get('embeddings') === '1' ||
+            searchParams.get('includeEmbeddings') === 'true'
 
-    const indexPager = await tl_client.indexes.list()
-    let indexId = null;
+        const indexPager = await tl_client.indexes.list()
+        let indexId = null;
 
-    for await (const index of indexPager) {
-        if (index.indexName === process.env.TL_INDEX_NAME) {
-            indexId = index.id
+        for await (const index of indexPager) {
+            if (index.indexName === process.env.TL_INDEX_NAME) {
+                indexId = index.id
+            }
         }
-    }
 
-    if (!indexId) {
-        return NextResponse.json({ error: "Index not found" }, { status: 404 })
-    }
+        if (!indexId) {
+            return NextResponse.json({ error: "Index not found" }, { status: 404 })
+        }
 
-    const videoPager = await tl_client.indexes.videos.list(indexId)
-    const videos = []
+        const videoPager = await tl_client.indexes.videos.list(indexId)
+        const videos = []
 
-    for await (const video of videoPager) {
+        for await (const video of videoPager) {
 
-        let embeddings = [];
+            let embeddings = [];
 
-        try {
-            const videoData = await tl_client.indexes.videos.retrieve(
-                indexId,
-                video.id,
-                {
-                    embeddingOption: ['visual']
-                }
-            )
+            if (includeEmbeddings) {
+                try {
+                    const videoData = await tl_client.indexes.videos.retrieve(
+                        indexId,
+                        video.id,
+                        {
+                            embeddingOption: ['visual']
+                        }
+                    )
 
-            const segments = videoData.embedding?.videoEmbedding?.segments || [];
+                    const segments = videoData.embedding?.videoEmbedding?.segments || [];
 
-            if (segments.length > 0) {
-                // Initialize sum vector with same dimension as first segment
-                const dim = segments[0].float?.length;
-                if (dim) {
-                    const sum = new Array(dim).fill(0);
-                    let count = 0;
+                    if (segments.length > 0) {
+                        // Initialize sum vector with same dimension as first segment
+                        const dim = segments[0].float?.length;
+                        if (dim) {
+                            const sum = new Array(dim).fill(0);
+                            let count = 0;
 
-                    for (const seg of segments) {
-                        if (seg.float && seg.float.length === dim) {
-                            for (let i = 0; i < dim; i++) {
-                                sum[i] += seg.float[i];
+                            for (const seg of segments) {
+                                if (seg.float && seg.float.length === dim) {
+                                    for (let i = 0; i < dim; i++) {
+                                        sum[i] += seg.float[i];
+                                    }
+                                    count++;
+                                }
                             }
-                            count++;
+
+                            if (count > 0) {
+                                // Compute average
+                                embeddings = sum.map(val => val / count);
+                            }
                         }
                     }
 
-                    if (count > 0) {
-                        // Compute average
-                        embeddings = sum.map(val => val / count);
-                    }
+                    console.log(`[Videos] ${video.id} → ${embeddings.length} embedding floats`);
+                } catch (embErr) {
+                    console.warn(`[Videos] Failed to get embeddings for ${video.id}:`, embErr.message);
                 }
             }
 
-            console.log(`[Videos] ${video.id} → ${embeddings.length} embedding floats`);
-        } catch (embErr) {
-            console.warn(`[Videos] Failed to get embeddings for ${video.id}:`, embErr.message);
+            videos.push({
+                ...video,
+                embeddings: embeddings
+            })
+
         }
 
-        videos.push({
-            ...video,
-            embeddings: embeddings
-        })
-
+        return NextResponse.json(videos, { status: 200 })
+    } catch (error) {
+        if (error instanceof TwelvelabsApiError && error.statusCode === 429) {
+            const body = error.body && typeof error.body === "object" ? error.body : {};
+            return NextResponse.json(
+                {
+                    code: body.code ?? "too_many_requests",
+                    message: typeof body.message === "string" ? body.message : "Rate limit exceeded.",
+                },
+                { status: 429 }
+            );
+        }
+        console.error("[videos GET]", error);
+        const msg = error instanceof Error ? error.message : "Failed to list videos";
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
-
-    return NextResponse.json(videos, { status: 200 })
-
 }
 
 export async function POST(request) {

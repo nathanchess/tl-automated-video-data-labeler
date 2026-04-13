@@ -33,28 +33,21 @@ function deriveAnnotationBounds(ann) {
     return { start, end };
 }
 
-/** Adjacent scene bars on the scrubber with no gaps (assigns dead air to the prior scene for display). */
-function computeContiguousSceneSpans(annotations, durationSec) {
+/**
+ * Scene bars on the scrubber: one bar per annotation using its scene bounds only.
+ * (We do not "tile" to the next scene's start — that contiguous logic collapsed to ~0 width
+ * when adjacent rows shared the same start time or overlapped, hiding whole segments.)
+ */
+function computeSceneBarSpans(annotations, durationSec) {
     if (!annotations?.length || !durationSec || durationSec <= 0) return [];
-    const rows = annotations
+    return annotations
         .map((ann, index) => {
             const { start, end } = deriveAnnotationBounds(ann);
-            return { index, start, end };
+            const displayStart = Math.max(0, Math.min(start, durationSec));
+            const displayEnd = Math.max(displayStart + 0.5, Math.min(end, durationSec));
+            return { annotationIndex: index, displayStart, displayEnd };
         })
-        .filter((r) => r.end > r.start)
-        .sort((a, b) => a.start - b.start);
-
-    if (rows.length === 0) return [];
-
-    const spans = [];
-    for (let j = 0; j < rows.length; j++) {
-        const displayStart = j === 0 ? 0 : spans[j - 1].end;
-        let displayEnd = j < rows.length - 1 ? rows[j + 1].start : durationSec;
-        displayEnd = Math.min(durationSec, Math.max(displayEnd, displayStart + 0.5));
-        if (displayEnd <= displayStart) displayEnd = Math.min(durationSec, displayStart + 0.5);
-        spans.push({ annotationIndex: rows[j].index, displayStart, displayEnd });
-    }
-    return spans;
+        .filter((s) => s.displayEnd > s.displayStart);
 }
 
 export default function VideoAnnotationPage({ params }) {
@@ -347,9 +340,9 @@ export default function VideoAnnotationPage({ params }) {
                                     ))}
                                 </div>
 
-                                {/* LAYER 1: Background Scene/Summary Segments (contiguous spans — no dead gaps on scrubber) */}
+                                {/* LAYER 1: Background Scene/Summary Segments (one bar per scene bounds) */}
                                 <div className="absolute top-0 bottom-0 left-0 right-0">
-                                    {computeContiguousSceneSpans(annotationData.annotations, duration).map((span) => {
+                                    {computeSceneBarSpans(annotationData.annotations, duration).map((span) => {
                                         const i = span.annotationIndex;
                                         const ann = annotationData.annotations[i];
                                         if (!ann) return null;
