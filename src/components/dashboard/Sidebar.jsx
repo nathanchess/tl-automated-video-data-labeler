@@ -199,7 +199,7 @@ export default function Sidebar() {
     const sidebarContent = (
         <div className="flex flex-col h-full">
             {/* Brand */}
-            <div className="flex items-center justify-center px-6 py-5">
+            <div className="flex flex-col items-center px-6 py-5 gap-3">
                 {collapsed ? (
                     <Image
                         src="/TwelveLabs-Symbol.png"
@@ -217,6 +217,18 @@ export default function Sidebar() {
                         className="rounded-lg"
                     />
                 )}
+                <span
+                    title={collapsed ? 'Demo App' : undefined}
+                    className={`
+                        gradient-border gradient-wash inline-flex items-center justify-center
+                        rounded-lg font-semibold uppercase tracking-wider
+                        text-primary-700 dark:text-primary-300
+                        bg-primary-50/90 dark:bg-primary-500/10
+                        ${collapsed ? 'w-8 h-8 text-[10px]' : 'px-3 py-1.5 text-[11px]'}
+                    `}
+                >
+                    {collapsed ? 'D' : 'Demo App'}
+                </span>
             </div>
 
             {/* Main nav */}
