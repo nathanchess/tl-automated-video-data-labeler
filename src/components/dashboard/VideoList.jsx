@@ -2,8 +2,17 @@
 'use client';
 
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { Search, Film, X, Clock, Monitor, Gauge, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
-import Link from 'next/link';
+import {
+    SearchIcon,
+    VideoIcon,
+    CloseIcon,
+    HistoryIcon,
+    DevicesIcon,
+    UsageIcon,
+    CheckmarkFilledIcon,
+    ArrowDiagonalIcon,
+    IdeaIcon,
+} from '@twelvelabs-io/react';
 import Hls from 'hls.js';
 
 /** Pretty-print seconds → 0:04 / 1:23:45 */
@@ -78,7 +87,7 @@ function StatusIndicator({ status }) {
             <div
                 className={`
                     absolute right-0 top-full mt-2 px-3 py-2 rounded-lg
-                    bg-gray-900 dark:bg-gray-800 shadow-lg border border-gray-700
+                    bg-gray-900 dark:bg-gray-800 shadow-lg border border-border-secondary
                     whitespace-nowrap pointer-events-none
                     transition-all duration-200 origin-top-right
                     ${showTooltip
@@ -92,7 +101,7 @@ function StatusIndicator({ status }) {
                 </div>
                 <p className="text-[10px] text-gray-400">{cfg.description}</p>
                 {/* Arrow */}
-                <div className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-gray-700" />
+                <div className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-border-secondary" />
             </div>
         </div>
     );
@@ -182,10 +191,31 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
 
     const isAnnotated = status === 'ready' || status === 'needs_review';
 
+    const openAnnotationPage = () => {
+        // Handoff playback URL so the detail page can play even if stored annotations omit hls.
+        // Use localStorage (shared across tabs) — sessionStorage is not reliable with window.open.
+        try {
+            localStorage.setItem(
+                `video_playback_${indexName}_${filename}`,
+                JSON.stringify({
+                    url: hlsUrl,
+                    video_url: hlsUrl,
+                    hls: video.hls,
+                    duration,
+                }),
+            );
+        } catch {
+            /* ignore quota / private mode */
+        }
+        window.open(
+            `/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`,
+            '_blank',
+        );
+    };
+
     const handleCardClick = () => {
         if (isAnnotated) {
-            // Open annotation page in new tab
-            window.open(`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`, '_blank');
+            openAnnotationPage();
         } else if (status !== 'processing') {
             onToggleSelect(video.id);
         }
@@ -197,14 +227,14 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             className={`
-                group relative rounded-2xl bg-[var(--surface)] border-2 overflow-hidden shadow-card card-lift cursor-pointer transition-all duration-150
+                group relative rounded-2xl bg-surface-white border-2 overflow-hidden shadow-card card-lift cursor-pointer transition-all duration-150
                 ${isAnnotated
                     ? 'border-green-500/40 hover:border-green-500/60'
                     : isSelected
-                        ? 'border-primary-500 ring-2 ring-primary-400/30'
+                        ? 'border-tl-master-brand-green ring-2 ring-tl-master-brand-green/30'
                         : matches
-                            ? 'border-indigo-500/50 hover:border-indigo-500/70 ring-1 ring-indigo-500/20'
-                            : 'border-[var(--border)] hover:border-[var(--text-tertiary)]'}
+                            ? 'border-tl-master-brand-green/50 hover:border-tl-master-brand-green/70 ring-1 ring-tl-master-brand-green/20'
+                            : 'border-border-secondary hover:border-border-secondary'}
             `}
         >
             {/* Hover glow */}
@@ -219,10 +249,10 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
                     <div className={`
                         w-6 h-6 rounded-full flex items-center justify-center
                         ${isSelected
-                            ? 'bg-primary-500 text-gray-900'
+                            ? 'bg-tl-master-brand-green text-gray-900'
                             : 'bg-black/40 text-white backdrop-blur-sm'}
                     `}>
-                        <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
+                        <CheckmarkFilledIcon className="w-4 h-4" />
                     </div>
                 </div>
             )}
@@ -237,8 +267,8 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
             {/* Semantic Match Badge */}
             {bestMatch && (
                 <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start animate-fade-in-up">
-                    <div className="px-2 py-1 bg-indigo-500/90 text-white text-xs font-bold rounded-lg shadow-lg flex items-center gap-1.5 backdrop-blur-sm">
-                        <Sparkles className="w-3 h-3 text-yellow-300" />
+                    <div className="px-2 py-1 bg-surface-primary/90 text-white text-xs font-bold rounded-lg shadow-lg flex items-center gap-1.5 backdrop-blur-sm">
+                        <IdeaIcon className="w-3 h-3 text-yellow-300" />
                         <span>Match found at {formatDuration(bestMatch.start)}</span>
                     </div>
                     {matchCount > 1 && (
@@ -250,7 +280,7 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
             )}
 
             {/* Thumbnail + hover video */}
-            <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+            <div className="relative aspect-video bg-surface-card flex items-center justify-center overflow-hidden">
                 {/* Thumbnail (always behind) */}
                 {thumbnailUrl ? (
                     <img
@@ -260,7 +290,7 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
                         loading="lazy"
                     />
                 ) : (
-                    <Film className="w-10 h-10 text-[var(--text-tertiary)]" strokeWidth={1} />
+                    <VideoIcon className="w-10 h-10 text-foreground-subtle" />
                 )}
 
                 {/* Video overlay (hidden until hover) */}
@@ -277,7 +307,7 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
 
                 {/* Duration pill */}
                 {duration && (
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-xs font-mono z-10">
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-xs font-tl-mono z-10">
                         {formatDuration(duration)}
                     </span>
                 )}
@@ -285,26 +315,26 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
 
             {/* Info */}
             <div className="p-4">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate mb-3" title={filename}>
+                <h3 className="text-sm font-semibold text-foreground-body truncate mb-3" title={filename}>
                     {filename}
                 </h3>
 
                 {/* System metadata stats */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3">
                     {fps && (
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-                            <Gauge className="w-3.5 h-3.5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-                            <span className="font-mono">{Math.round(fps)} fps</span>
+                        <div className="flex items-center gap-1.5 text-xs text-foreground-secondary">
+                            <UsageIcon className="w-3.5 h-3.5 text-foreground-subtle" />
+                            <span className="font-tl-mono">{Math.round(fps)} fps</span>
                         </div>
                     )}
                     {width && height && (
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-                            <Monitor className="w-3.5 h-3.5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-                            <span className="font-mono">{width}×{height}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-foreground-secondary">
+                            <DevicesIcon className="w-3.5 h-3.5 text-foreground-subtle" />
+                            <span className="font-tl-mono">{width}×{height}</span>
                         </div>
                     )}
                     {size && (
-                        <span className="text-xs text-[var(--text-tertiary)] font-mono">
+                        <span className="text-xs text-foreground-subtle font-tl-mono">
                             {formatBytes(size)}
                         </span>
                     )}
@@ -312,8 +342,8 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
 
                 {/* Date */}
                 {createdAt && (
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
-                        <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    <div className="flex items-center gap-1.5 text-xs text-foreground-subtle">
+                        <HistoryIcon className="w-3.5 h-3.5" />
                         <span>{formatDate(createdAt)}</span>
                     </div>
                 )}
@@ -322,20 +352,21 @@ function VideoCard({ video, isSelected, onToggleSelect, status, indexName, match
                 {status && (
                     status === 'processing' ? (
                         <div className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-gray-500/10 text-gray-400 cursor-not-allowed">
-                            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                            <ArrowDiagonalIcon className="w-3.5 h-3.5" />
                             Processing…
                         </div>
                     ) : (
-                        <Link
-                            href={`/${encodeURIComponent(indexName)}/${encodeURIComponent(filename)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-medium bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors"
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openAnnotationPage();
+                            }}
+                            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-tl-master-brand-green/10 py-2 text-xs font-medium text-tl-master-brand-green transition-colors hover:bg-tl-master-brand-green/20"
                         >
-                            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                            <ArrowDiagonalIcon className="size-3.5" />
                             View Annotation
-                        </Link>
+                        </button>
                     )
                 )}
             </div>
@@ -391,11 +422,11 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
     if (videos.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-                <Film className="w-12 h-12 text-[var(--text-tertiary)] mb-4" strokeWidth={1} />
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">
+                <VideoIcon className="w-12 h-12 text-foreground-subtle mb-4" />
+                <h3 className="text-lg font-semibold text-foreground-body mb-1">
                     No videos found
                 </h3>
-                <p className="text-sm text-[var(--text-secondary)] max-w-md">
+                <p className="text-sm text-foreground-secondary max-w-md">
                     No videos with metadata matching &ldquo;{indexName}&rdquo; were found in this index.
                 </p>
             </div>
@@ -406,10 +437,10 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
         <div>
             {/* Results count */}
             {search && (
-                <p className="text-xs text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+                <p className="text-xs text-foreground-secondary mb-4 flex items-center gap-2">
                     {searchResults ? (
                         <>
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                            <IdeaIcon className="w-3.5 h-3.5 text-indigo-400" />
                             <span>Found {filtered.length} relevant results</span>
                         </>
                     ) : (
@@ -436,8 +467,8 @@ export default function VideoList({ videos, indexName, search, onSearchChange, s
             {/* No results for filter */}
             {filtered.length === 0 && search && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Search className="w-8 h-8 text-[var(--text-tertiary)] mb-3" strokeWidth={1} />
-                    <p className="text-sm text-[var(--text-secondary)]">
+                    <SearchIcon className="w-8 h-8 text-foreground-subtle mb-3" />
+                    <p className="text-sm text-foreground-secondary">
                         No videos matching &ldquo;{search}&rdquo;
                     </p>
                 </div>

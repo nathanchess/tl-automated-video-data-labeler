@@ -1,20 +1,13 @@
-import { MessageCircle } from 'lucide-react';
+import { SpeechIcon } from '@twelvelabs-io/react';
 
 export default function FloatingActionButton() {
     return (
         <button
-            className="
-        fixed bottom-6 right-6 z-50
-        w-14 h-14 rounded-full
-        bg-gray-900 dark:bg-white
-        flex items-center justify-center
-        shadow-lg hover:scale-110
-        transition-transform duration-200
-        cursor-pointer
-      "
+            type="button"
+            className="fixed bottom-6 right-6 z-50 flex size-14 cursor-pointer items-center justify-center rounded-full bg-surface-primary text-foreground-primary shadow-lg transition-transform duration-200 hover:scale-110"
             aria-label="Open chat"
         >
-            <MessageCircle className="w-6 h-6 text-white dark:text-gray-900" strokeWidth={1.5} />
+            <SpeechIcon className="size-6" />
         </button>
     );
 }

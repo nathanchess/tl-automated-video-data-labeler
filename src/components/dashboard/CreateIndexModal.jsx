@@ -1,6 +1,14 @@
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Trash2, AlertCircle, Loader2, Check, Info } from 'lucide-react';
+import {
+    CloseIcon,
+    UploadIcon,
+    DeleteIcon,
+    ExclamationIcon,
+    SpinnerIcon,
+    CheckIcon,
+    InfoIcon,
+} from '@twelvelabs-io/react';
 import { upload } from '@vercel/blob/client';
 
 const MIN_DURATION = 4;        // seconds
@@ -117,7 +125,7 @@ function UploadVideoPreview({ video: v, onRemove, creating }) {
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                 />
-                <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono pointer-events-none z-[1]">
+                <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-tl-mono pointer-events-none z-[1]">
                     {formatDuration(v.duration)}
                 </span>
                 {isHovered && isPlaying && (
@@ -139,7 +147,7 @@ function UploadVideoPreview({ video: v, onRemove, creating }) {
                         className="absolute top-1.5 right-1.5 z-[2] p-1 rounded-full bg-black/50 text-white opacity-0 group-hover/vid:opacity-100 transition-opacity cursor-pointer hover:bg-red-600"
                         aria-label="Remove video"
                     >
-                        <X className="w-3 h-3" strokeWidth={2} />
+                        <CloseIcon className="w-3 h-3" />
                     </button>
                 )}
             </div>
@@ -412,7 +420,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                         className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-40"
                         aria-label="Close"
                     >
-                        <X className="w-5 h-5 text-gray-500" strokeWidth={1.5} />
+                        <CloseIcon className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
 
@@ -433,7 +441,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                             onChange={(e) => setIndexName(e.target.value)}
                             placeholder="e.g. Autonomous Driving Q1 Batch"
                             disabled={creating || isPresetMode}
-                            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition disabled:opacity-60"
+                            className="w-full rounded-xl border border-border-secondary bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-tl-master-brand-light-green focus:ring-2 focus:ring-tl-master-brand-green/20 transition disabled:opacity-60"
                         />
                     </div>
 
@@ -451,7 +459,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                             placeholder="e.g. Dashcam footage for perception model training data…"
                             rows={3}
                             disabled={creating || isPresetMode}
-                            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition resize-none disabled:opacity-60"
+                            className="w-full rounded-xl border border-border-secondary bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-tl-master-brand-light-green focus:ring-2 focus:ring-tl-master-brand-green/20 transition resize-none disabled:opacity-60"
                         />
                     </div>
 
@@ -482,12 +490,12 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                 flex flex-col items-center justify-center gap-2 cursor-pointer
                                 transition-colors
                                 ${dragging
-                                    ? 'border-primary-400 bg-primary-50/40'
-                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'}
+                                    ? 'border-tl-master-brand-light-green bg-tl-master-brand-lightest-emeraldgreen/40'
+                                    : 'border-border-secondary bg-gray-50 hover:border-gray-300'}
                                 ${creating ? 'pointer-events-none opacity-50' : ''}
                             `}
                         >
-                            <Upload className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
+                            <UploadIcon className="w-8 h-8 text-gray-300" />
                             <p className="text-sm text-gray-500">
                                 <span className="font-medium text-gray-700">Click to browse</span> or drag & drop videos here
                             </p>
@@ -507,7 +515,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                             <div className="mt-3 flex flex-col gap-1.5">
                                 {errors.map((err, i) => (
                                     <div key={i} className="flex items-start gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
-                                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={2} />
+                                        <ExclamationIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                                         <span>{err}</span>
                                     </div>
                                 ))}
@@ -534,7 +542,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                                 onClick={() => setShowIndexingInfo(true)}
                                                 className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer"
                                             >
-                                                <Info className="w-3 h-3" strokeWidth={1.5} />
+                                                <InfoIcon className="w-3 h-3" />
                                                 <span>
                                                     Est. indexing time: ~{estimatedIndexingRange}
                                                 </span>
@@ -546,7 +554,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                         disabled={creating}
                                         className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                        <DeleteIcon className="w-3.5 h-3.5" />
                                         Clear all
                                     </button>
                                 </div>
@@ -573,9 +581,9 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                         <div className="mb-5">
                             <div className="flex items-center gap-2 mb-2">
                                 {isComplete ? (
-                                    <Check className="w-4 h-4 text-green-600" strokeWidth={3} />
+                                    <CheckIcon className="w-4 h-4 text-green-600" />
                                 ) : (
-                                    <Loader2 className="w-4 h-4 text-primary-500 animate-spin" strokeWidth={2} />
+                                    <SpinnerIcon className="w-4 h-4 text-tl-master-brand-green animate-spin" />
                                 )}
                                 <span className={`text-sm font-medium ${isComplete ? 'text-green-700' : 'text-gray-600'}`}>
                                     {statusMessage || STATUS_MESSAGES[statusIdx]}
@@ -588,7 +596,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                         width: `${progress}%`,
                                         background: isComplete
                                             ? '#16A34A' // green-600
-                                            : 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
+                                            : 'linear-gradient(135deg, var(--tl-color-master-brand-green) 0%, var(--tl-color-master-brand-orange) 100%)',
                                     }}
                                 />
                             </div>
@@ -602,7 +610,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                         onClick={() => setShowIndexingInfo(true)}
                                         className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer self-start"
                                     >
-                                        <Info className="w-3 h-3" strokeWidth={1.5} />
+                                        <InfoIcon className="w-3 h-3" />
                                         <span>
                                             Indexing typically finishes in ~30–40% of video duration (~{estimatedIndexingRange})
                                         </span>
@@ -622,11 +630,11 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                         style={{
                             background: isComplete
                                 ? '#4ADE80' // green-400
-                                : 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)',
+                                : 'linear-gradient(135deg, var(--tl-color-master-brand-green) 0%, var(--tl-color-master-brand-orange) 100%)',
                         }}
                     >
                         {isComplete
-                            ? <span className="flex items-center justify-center gap-2"><Check className="w-4 h-4" strokeWidth={3} /> Complete!</span>
+                            ? <span className="flex items-center justify-center gap-2"><CheckIcon className="w-4 h-4" /> Complete!</span>
                             : (creating
                                 ? (isPresetMode ? 'Uploading…' : 'Creating Index…')
                                 : (isPresetMode ? 'Upload Videos' : 'Create Index'))
@@ -647,10 +655,10 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                         onClick={() => setShowIndexingInfo(false)}
                     />
-                    <div className="relative w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl border border-gray-200 p-5">
+                    <div className="relative w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl border border-border-secondary p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex items-center gap-2">
-                                <Info className="w-4 h-4 text-gray-700" strokeWidth={1.8} />
+                                <InfoIcon className="w-4 h-4 text-gray-700" />
                                 <h3 className="text-sm font-semibold text-gray-900">
                                     About indexing time
                                 </h3>
@@ -661,7 +669,7 @@ export default function CreateIndexModal({ open, onClose, onComplete, presetInde
                                 className="p-1 rounded-md hover:bg-gray-100 cursor-pointer"
                                 aria-label="Close"
                             >
-                                <X className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+                                <CloseIcon className="w-4 h-4 text-gray-500" />
                             </button>
                         </div>
                         <p className="text-xs text-gray-600 leading-relaxed">

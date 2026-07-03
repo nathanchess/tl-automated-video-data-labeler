@@ -1,12 +1,13 @@
 import Link from 'next/link';
-import { MoreVertical } from 'lucide-react';
+import { EllipsisIcon } from '@twelvelabs-io/react';
 
-const PLACEHOLDER_THUMB = 'data:image/svg+xml,' + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" fill="none"><rect width="400" height="300" fill="#e5e7eb"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="system-ui" font-size="14" fill="#9ca3af">No preview</text></svg>`
-);
+const PLACEHOLDER_THUMB =
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" fill="none"><rect width="400" height="300" fill="#ececec"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="system-ui" font-size="14" fill="#8f8984">No preview</text></svg>`,
+    );
 
 export default function IndexCard({ title, description, videoCount, date, duration, thumbnails }) {
-    // Ensure we always have 4 thumbnails — fill with placeholders
     const thumbs = [...(thumbnails || [])];
     while (thumbs.length < 4) {
         thumbs.push(PLACEHOLDER_THUMB);
@@ -15,68 +16,46 @@ export default function IndexCard({ title, description, videoCount, date, durati
     return (
         <Link
             href={`/${encodeURIComponent(title)}`}
-            className="
-                group relative rounded-2xl bg-[var(--surface)] border border-[var(--border)]
-                overflow-hidden cursor-pointer card-lift shadow-card block no-underline
-            "
+            className="group relative block cursor-pointer overflow-hidden rounded-2xl border border-border-secondary bg-surface-white no-underline card-lift shadow-card"
         >
-            {/* Hover bottom glow */}
-            <div
-                className="
-                    absolute bottom-0 left-0 right-0 h-[3px]
-                    gradient-bg opacity-0 group-hover:opacity-100
-                    transition-opacity duration-200 z-10
-                "
-            />
+            <div className="absolute bottom-0 left-0 right-0 z-10 h-[3px] gradient-bg opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
-            {/* Thumbnail 2×2 bento grid */}
-            <div className="grid grid-cols-2 grid-rows-2 gap-0.5 aspect-[2/1] bg-gray-100 dark:bg-gray-800 relative">
+            <div className="relative grid aspect-[2/1] grid-cols-2 grid-rows-2 gap-0.5 bg-surface-card">
                 {thumbs.slice(0, 4).map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                         key={i}
                         src={src}
                         alt={`${title} thumbnail ${i + 1}`}
-                        className="object-cover w-full h-full"
+                        className="h-full w-full object-cover"
                         loading="lazy"
                     />
                 ))}
 
-                {/* Video count pill */}
-                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-xs font-mono">
+                <span className="absolute right-2 top-2 rounded-full bg-surface-primary/80 px-2 py-0.5 font-tl-mono text-xs text-foreground-primary">
                     {videoCount} video{videoCount !== 1 ? 's' : ''}
                 </span>
             </div>
 
-            {/* Meta area */}
-            <div className="p-4 flex items-start justify-between gap-2">
+            <div className="flex items-start justify-between gap-2 p-4">
                 <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                        {title}
-                    </h3>
+                    <h3 className="truncate text-sm font-semibold text-foreground-body">{title}</h3>
                     {description && (
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-                            {description}
-                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-foreground-secondary">{description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-2">
-                        <span className="text-xs text-[var(--text-tertiary)]">{date}</span>
-                        <span className="text-xs text-[var(--text-tertiary)] font-mono">
-                            {duration}
-                        </span>
+                    <div className="mt-2 flex items-center gap-3">
+                        <span className="text-xs text-foreground-subtle">{date}</span>
+                        <span className="font-tl-mono text-xs text-foreground-subtle">{duration}</span>
                     </div>
                 </div>
 
-                {/* Kebab menu */}
                 <button
-                    className="
-                        p-1 rounded-lg opacity-0 group-hover:opacity-100
-                        hover:bg-gray-100 dark:hover:bg-gray-700
-                        transition-all cursor-pointer shrink-0
-                    "
+                    type="button"
+                    className="shrink-0 cursor-pointer rounded-lg p-1 opacity-0 transition-all hover:bg-surface-card group-hover:opacity-100"
                     aria-label="More options"
                     onClick={(e) => e.preventDefault()}
                 >
-                    <MoreVertical className="w-4 h-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                    <EllipsisIcon className="size-4 text-foreground-subtle" />
                 </button>
             </div>
         </Link>

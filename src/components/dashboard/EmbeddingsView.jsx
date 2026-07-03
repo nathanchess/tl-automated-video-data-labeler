@@ -1,6 +1,18 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ZoomIn, ZoomOut, Maximize, Play, Clock, FileText, Loader2, X, ScatterChart, Cpu } from 'lucide-react';
+import {
+    SearchIcon,
+    ExpandIcon,
+    CollapseIcon,
+    FullScreenIcon,
+    PlayIcon,
+    HistoryIcon,
+    TextIcon,
+    SpinnerIcon,
+    CloseIcon,
+    CanvasIcon,
+    MarengoIcon,
+} from '@twelvelabs-io/react';
 
 const POINT_SIZE = 16;
 const HOVER_SCALE = 2;
@@ -90,7 +102,7 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
 
                         const N = centered.length;
 
-                        // 2. Build N×N gram matrix (K = X · X^T) — much smaller than dim×dim
+                        // 2. Build N×N gram matrix (K = Close · Close^T) — much smaller than dim×dim
                         console.log(`[Embeddings] Building ${N}x${N} gram matrix...`);
                         const K = Array.from({ length: N }, () => new Array(N).fill(0));
                         for (let i = 0; i < N; i++) {
@@ -223,22 +235,22 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
             {/* Subheaders */}
             <div className="mb-5">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 rounded-xl bg-primary-500/10">
-                        <ScatterChart className="w-5 h-5 text-primary-500" strokeWidth={1.5} />
+                    <div className="p-2 rounded-xl bg-tl-master-brand-green/10">
+                        <CanvasIcon className="w-5 h-5 text-tl-master-brand-green" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                        <h2 className="text-lg font-semibold text-foreground-body">
                             Embedding Cluster Visualization
                         </h2>
-                        <p className="text-sm text-[var(--text-secondary)]">
+                        <p className="text-sm text-foreground-secondary">
                             Visualize how your annotated videos cluster in semantic space
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] ml-[52px]">
-                    <Cpu className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <div className="flex items-center gap-2 text-xs text-foreground-subtle ml-[52px]">
+                    <MarengoIcon className="w-3.5 h-3.5" />
                     <span>
-                        Marengo video embeddings projected to 2D via <strong className="text-[var(--text-secondary)]">Principal Component Analysis (PCA)</strong> — similar videos appear closer together
+                        Marengo video embeddings projected to 2D via <strong className="text-foreground-secondary">Principal Component Analysis (PCA)</strong> — similar videos appear closer together
                     </span>
                 </div>
             </div>
@@ -246,9 +258,9 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
             {/* Canvas */}
             <div
                 ref={containerRef}
-                className="relative w-full flex-1 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 overflow-hidden select-none cursor-move"
+                className="relative w-full flex-1 rounded-2xl border border-dashed border-border-secondary dark:border-border-secondary overflow-hidden select-none cursor-move"
                 style={{
-                    backgroundColor: 'var(--surface, #fafafa)',
+                    backgroundColor: 'var(--tl-surface-white)',
                     backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.25) 1px, transparent 1px)',
                     backgroundSize: '20px 20px',
                 }}
@@ -258,25 +270,25 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
                 onMouseLeave={handleMouseUp}
             >
                 {/* Controls */}
-                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                    <button onClick={() => setTransform(p => ({ ...p, k: Math.min(p.k + 0.5, 5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                        <ZoomIn className="w-5 h-5" />
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 bg-surface-white p-1.5 rounded-xl shadow-lg border border-border-secondary dark:border-border-secondary">
+                    <button onClick={() => setTransform(p => ({ ...p, k: Math.min(p.k + 0.5, 5) }))} className="p-2 hover:bg-surface-card rounded-lg text-gray-600 dark:text-gray-300">
+                        <ExpandIcon className="w-5 h-5" />
                     </button>
-                    <button onClick={() => setTransform(p => ({ ...p, k: Math.max(p.k - 0.5, 0.5) }))} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                        <ZoomOut className="w-5 h-5" />
+                    <button onClick={() => setTransform(p => ({ ...p, k: Math.max(p.k - 0.5, 0.5) }))} className="p-2 hover:bg-surface-card rounded-lg text-gray-600 dark:text-gray-300">
+                        <CollapseIcon className="w-5 h-5" />
                     </button>
                     <div className="h-px bg-gray-200 dark:bg-gray-700 mx-1" />
-                    <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
-                        <Maximize className="w-5 h-5" />
+                    <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} className="p-2 hover:bg-surface-card rounded-lg text-gray-600 dark:text-gray-300">
+                        <FullScreenIcon className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Error/Loading */}
                 {(loading || isFetchingEmbeddings) && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/50 dark:bg-black/50 backdrop-blur-sm px-6 text-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                        <SpinnerIcon className="w-8 h-8 animate-spin text-tl-master-brand-green" />
                         {isFetchingEmbeddings && (
-                            <p className="text-xs text-[var(--text-secondary)] max-w-sm">
+                            <p className="text-xs text-foreground-secondary max-w-sm">
                                 Fetching Marengo embeddings from TwelveLabs (one request per video). This only runs when you open this tab.
                             </p>
                         )}
@@ -321,12 +333,12 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
                                     onMouseLeave={() => setHoveredVideo(null)}
                                     onClick={(e) => { e.stopPropagation(); setSelectedVideo(pt.video); }}
                                 >
-                                    <div className={`w-full h-full rounded bg-gradient-to-br from-[#D9F99D] to-[#FDE047] shadow-sm shadow-black/20 ${isSelected ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`} />
+                                    <div className={`w-full h-full rounded bg-gradient-to-br from-tl-master-brand-green to-tl-master-brand-orange shadow-sm shadow-black/20 ${isSelected ? 'ring-2 ring-tl-master-brand-green ring-offset-2' : ''}`} />
 
                                     {/* Hover Tooltip */}
                                     {(isHovered || isSelected) && (
                                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 animate-fade-in-up">
-                                            <div className="w-24 h-14 bg-gray-900 rounded-lg overflow-hidden border border-gray-700 shadow-xl">
+                                            <div className="w-24 h-14 bg-gray-900 rounded-lg overflow-hidden border border-border-secondary shadow-xl">
                                                 <video
                                                     src={pt.video.hls?.video_url || pt.video.video_url}
                                                     className="w-full h-full object-cover"
@@ -350,7 +362,7 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
 
                 {/* Preview Card */}
                 {selectedVideo && (
-                    <div className="absolute top-4 right-4 z-30 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+                    <div className="absolute top-4 right-4 z-30 w-80 bg-surface-white rounded-2xl shadow-2xl border border-border-secondary dark:border-border-secondary overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
                         <div className="relative aspect-video bg-black group">
                             <video
                                 src={selectedVideo.hls?.video_url || selectedVideo.video_url}
@@ -362,7 +374,7 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
                                 onClick={() => setSelectedVideo(null)}
                                 className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
                             >
-                                <X className="w-4 h-4" />
+                                <CloseIcon className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="p-4">
@@ -371,11 +383,11 @@ export default function EmbeddingsView({ videos, isFetchingEmbeddings = false })
                             </h3>
                             <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
                                 <span className="flex items-center gap-1">
-                                    <Clock className="w-3.5 h-3.5" />
+                                    <HistoryIcon className="w-3.5 h-3.5" />
                                     {Math.round(selectedVideo.systemMetadata?.duration || 0)}s
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <FileText className="w-3.5 h-3.5" />
+                                    <TextIcon className="w-3.5 h-3.5" />
                                     {((selectedVideo.systemMetadata?.size || 0) / 1024 / 1024).toFixed(1)} MB
                                 </span>
                             </div>

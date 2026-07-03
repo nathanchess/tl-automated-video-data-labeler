@@ -1,8 +1,21 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useMemo, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Plus, Sparkles, RefreshCw, Tag, X, PlusCircle, Download, Search, LayoutGrid, Database, ArrowRight } from 'lucide-react';
+import {
+    ArrowLeftIcon,
+    SpinnerIcon,
+    PlusIcon,
+    IdeaIcon,
+    RefreshIcon,
+    EntityIcon,
+    CloseIcon,
+    DownloadIcon,
+    SearchIcon,
+    GridIcon,
+    ServersIcon,
+    ArrowRightIcon,
+} from '@twelvelabs-io/react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import VideoList from '@/components/dashboard/VideoList';
 import CreateIndexModal from '@/components/dashboard/CreateIndexModal';
@@ -889,7 +902,7 @@ export default function IndexDetailPage({ params }) {
 
             } catch (err) {
                 if (err?.isRateLimit) {
-                    // Save whatever chunks completed for this video before stopping.
+                    // CheckCircle whatever chunks completed for this video before stopping.
                     let partialContext = null;
                     if (annotations.length > 0) {
                         const videoObj = videos.find(v => v._id === videoId || v.id === videoId);
@@ -981,25 +994,25 @@ export default function IndexDetailPage({ params }) {
                 <div className="mb-8">
                     <button
                         onClick={() => router.push('/indexes')}
-                        className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mb-4 cursor-pointer"
+                        className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-foreground-body transition-colors mb-4 cursor-pointer"
                     >
-                        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
+                        <ArrowLeftIcon className="w-4 h-4" />
                         Back to Indexes
                     </button>
 
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+                            <h1 className="text-2xl font-bold text-foreground-body">
                                 {decodedName}
                             </h1>
 
                             {indexDescription && (
-                                <p className="text-sm text-[var(--text-secondary)] mt-1.5 max-w-2xl">
+                                <p className="text-sm text-foreground-secondary mt-1.5 max-w-2xl">
                                     {indexDescription}
                                 </p>
                             )}
 
-                            <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                            <p className="text-xs text-foreground-subtle mt-2">
                                 {loading
                                     ? 'Loading videos…'
                                     : `${videos.length} video${videos.length !== 1 ? 's' : ''} in this index`}
@@ -1013,11 +1026,11 @@ export default function IndexDetailPage({ params }) {
                                 <div ref={searchRef} className={`relative transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-80 md:w-[480px]' : 'w-56 md:w-64'}`}>
                                     <div className={`
                                         absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors
-                                        ${isSearchExpanded ? 'text-primary-500' : 'text-[var(--text-tertiary)]'}
+                                        ${isSearchExpanded ? 'text-tl-master-brand-green' : 'text-foreground-subtle'}
                                     `}>
                                         {searching
-                                            ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-                                            : <Search className="w-4 h-4" strokeWidth={isSearchExpanded ? 2 : 1.5} />}
+                                            ? <SpinnerIcon className="w-4 h-4 animate-spin" />
+                                            : <SearchIcon className="w-4 h-4" />}
                                     </div>
                                     <input
                                         type="text"
@@ -1028,11 +1041,11 @@ export default function IndexDetailPage({ params }) {
                                         placeholder={isSearchExpanded ? "Describe what you're looking for…" : "Semantic Search…"}
                                         className={`
                                             w-full pl-10 pr-20 py-2.5 rounded-xl text-sm transition-all
-                                            border bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]
-                                            focus:outline-none focus:ring-2 focus:ring-primary-400/20
+                                            border bg-surface-white text-foreground-body placeholder:text-foreground-subtle
+                                            focus:outline-none focus:ring-2 focus:ring-tl-master-brand-green/20
                                             ${isSearchExpanded
-                                                ? 'border-primary-500 shadow-lg shadow-primary-500/10'
-                                                : 'border-[var(--border)] hover:border-[var(--text-secondary)]'}
+                                                ? 'border-tl-master-brand-green shadow-lg shadow-tl-master-brand-green/10'
+                                                : 'border-border-secondary hover:border-border-secondary'}
                                         `}
                                     />
                                     {/* Action buttons */}
@@ -1040,29 +1053,29 @@ export default function IndexDetailPage({ params }) {
                                         {(search || searchResults) && (
                                             <button
                                                 onClick={clearSearch}
-                                                className="p-1 rounded-md cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--background)] transition-colors"
+                                                className="p-1 rounded-md cursor-pointer text-foreground-subtle hover:text-foreground-body hover:bg-surface-card transition-colors"
                                                 title="Clear search"
                                             >
-                                                <X className="w-3.5 h-3.5" />
+                                                <CloseIcon className="w-3.5 h-3.5" />
                                             </button>
                                         )}
                                         {search.trim() && (
                                             <button
                                                 onClick={() => handleSearch()}
                                                 disabled={searching}
-                                                className="p-1.5 rounded-lg cursor-pointer bg-primary-500 hover:bg-primary-600 text-white transition-colors disabled:opacity-50"
+                                                className="p-1.5 rounded-lg cursor-pointer bg-tl-master-brand-green hover:bg-tl-master-brand-dark-green text-white transition-colors disabled:opacity-50"
                                                 title="Search (Enter)"
                                             >
-                                                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                <ArrowRightIcon className="w-3.5 h-3.5" />
                                             </button>
                                         )}
                                     </div>
 
                                     {/* Preset Suggestions Dropdown */}
                                     {showSuggestions && isSearchExpanded && !search && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 overflow-hidden animate-fade-in">
+                                        <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-border-secondary bg-surface-white shadow-xl z-50 overflow-hidden animate-fade-in">
                                             <div className="px-3 pt-3 pb-1.5">
-                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">Try searching for…</p>
+                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">Try searching for…</p>
                                             </div>
                                             <div className="pb-1.5">
                                                 {SEARCH_SUGGESTIONS.map((suggestion) => (
@@ -1074,9 +1087,9 @@ export default function IndexDetailPage({ params }) {
                                                             setShowSuggestions(false);
                                                             handleSearch(suggestion);
                                                         }}
-                                                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2.5 cursor-pointer"
+                                                        className="w-full text-left px-3 py-2 text-sm text-foreground-secondary hover:bg-surface-card hover:text-foreground-body transition-colors flex items-center gap-2.5 cursor-pointer"
                                                     >
-                                                        <Sparkles className="w-3.5 h-3.5 text-primary-400 shrink-0" strokeWidth={1.5} />
+                                                        <IdeaIcon className="w-3.5 h-3.5 text-tl-master-brand-light-green shrink-0" />
                                                         {suggestion}
                                                     </button>
                                                 ))}
@@ -1095,13 +1108,13 @@ export default function IndexDetailPage({ params }) {
                                             : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                                             }`}
                                     >
-                                        <Download className="w-4 h-4" strokeWidth={2} />
+                                        <DownloadIcon className="w-4 h-4" />
                                         <span className="hidden md:inline">Download</span>
                                     </button>
                                     {Object.keys(videoStatuses).length === 0 && (
-                                        <div className="absolute right-0 top-full mt-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-800 shadow-lg border border-gray-700 whitespace-nowrap pointer-events-none opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 z-30">
+                                        <div className="absolute right-0 top-full mt-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-800 shadow-lg border border-border-secondary whitespace-nowrap pointer-events-none opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 z-30">
                                             <p className="text-xs text-gray-300">Annotate at least one video first</p>
-                                            <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-gray-700" />
+                                            <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-gray-900 dark:bg-gray-800 border-l border-t border-border-secondary" />
                                         </div>
                                     )}
                                 </div>
@@ -1110,9 +1123,9 @@ export default function IndexDetailPage({ params }) {
                                 <button
                                     onClick={() => setUploadModalOpen(true)}
                                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-900 cursor-pointer hover:brightness-95 transition-all"
-                                    style={{ background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)' }}
+                                    style={{ background: 'linear-gradient(135deg, var(--tl-color-master-brand-green) 0%, var(--tl-color-master-brand-orange) 100%)' }}
                                 >
-                                    <Plus className="w-4 h-4" strokeWidth={2} />
+                                    <PlusIcon className="w-4 h-4" />
                                     <span className="hidden md:inline">Upload</span>
                                 </button>
                             </div>
@@ -1121,31 +1134,31 @@ export default function IndexDetailPage({ params }) {
 
                     {/* Navigation Tabs */}
                     {!loading && (
-                        <div className="flex items-center gap-6 mt-6 border-b border-[var(--border)]">
+                        <div className="flex items-center gap-6 mt-6 border-b border-border-secondary">
                             <button
                                 onClick={() => setActiveTab('library')}
                                 className={`flex items-center gap-2 pb-3 text-sm font-medium transition-all relative ${activeTab === 'library'
-                                    ? 'text-primary-600 dark:text-primary-400'
-                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                    ? 'text-tl-master-brand-dark-green dark:text-tl-master-brand-light-green'
+                                    : 'text-foreground-subtle hover:text-foreground-body'
                                     }`}
                             >
-                                <LayoutGrid className="w-4 h-4" strokeWidth={2} />
+                                <GridIcon className="w-4 h-4" />
                                 Library
                                 {activeTab === 'library' && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 rounded-t-full" />
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-tl-master-brand-green rounded-t-full" />
                                 )}
                             </button>
                             <button
                                 onClick={() => setActiveTab('embeddings')}
                                 className={`flex items-center gap-2 pb-3 text-sm font-medium transition-all relative ${activeTab === 'embeddings'
-                                    ? 'text-primary-600 dark:text-primary-400'
-                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                    ? 'text-tl-master-brand-dark-green dark:text-tl-master-brand-light-green'
+                                    : 'text-foreground-subtle hover:text-foreground-body'
                                     }`}
                             >
-                                <Database className="w-4 h-4" strokeWidth={2} />
+                                <ServersIcon className="w-4 h-4" />
                                 Embeddings
                                 {activeTab === 'embeddings' && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 rounded-t-full" />
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-tl-master-brand-green rounded-t-full" />
                                 )}
                             </button>
                         </div>
@@ -1157,17 +1170,17 @@ export default function IndexDetailPage({ params }) {
                     <>
                         {/* Label Taxonomy (Combined) */}
                         {!loading && !error && (
-                            <div className="mb-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                            <div className="mb-8 rounded-2xl border border-border-secondary bg-surface-white overflow-hidden">
                                 {/* Header */}
                                 <div className="px-5 pt-5 pb-4">
                                     <div className="flex items-center justify-between mb-1">
                                         <div className="flex items-center gap-2">
-                                            <Tag className="w-4 h-4 text-[var(--text-secondary)]" strokeWidth={1.5} />
-                                            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+                                            <EntityIcon className="w-4 h-4 text-foreground-secondary" />
+                                            <h2 className="text-sm font-semibold text-foreground-body">
                                                 Label Taxonomy
                                             </h2>
                                             {domainLabels.size > 0 && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--background)] text-[var(--text-tertiary)] font-mono">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-card text-foreground-subtle font-tl-mono">
                                                     {domainLabels.size}
                                                 </span>
                                             )}
@@ -1176,14 +1189,14 @@ export default function IndexDetailPage({ params }) {
                                             <button
                                                 onClick={() => { setSuggestedClasses(null); runAnalysis(videos[0]?.id); }}
                                                 disabled={analyzingClasses}
-                                                className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer disabled:opacity-50"
+                                                className="flex items-center gap-1.5 text-xs text-foreground-subtle hover:text-foreground-secondary transition-colors cursor-pointer disabled:opacity-50"
                                             >
-                                                <RefreshCw className={`w-3 h-3 ${analyzingClasses ? 'animate-spin' : ''}`} strokeWidth={2} />
+                                                <RefreshIcon className={`w-3 h-3 ${analyzingClasses ? 'animate-spin' : ''}`} />
                                                 Re-analyze
                                             </button>
                                         )}
                                     </div>
-                                    <p className="text-xs text-[var(--text-tertiary)]">
+                                    <p className="text-xs text-foreground-subtle">
                                         Define annotation categories for standardized output. Add AI-suggested labels or type your own.
                                     </p>
                                 </div>
@@ -1197,14 +1210,14 @@ export default function IndexDetailPage({ params }) {
                                             onChange={(e) => setLabelInput(e.target.value)}
                                             onKeyDown={handleLabelKeyDown}
                                             placeholder="Add a custom label… (press Enter)"
-                                            className="w-full pl-3 pr-10 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 transition"
+                                            className="w-full pl-3 pr-10 py-2 rounded-xl border border-border-secondary bg-surface-card text-sm text-foreground-body placeholder:text-foreground-subtle outline-none focus:border-tl-master-brand-light-green focus:ring-2 focus:ring-tl-master-brand-green/20 transition"
                                         />
                                         {labelInput.trim() && (
                                             <button
                                                 onClick={() => { addLabel(labelInput); setLabelInput(''); }}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-surface-card transition-colors cursor-pointer"
                                             >
-                                                <Plus className="w-4 h-4 text-primary-500" strokeWidth={2} />
+                                                <PlusIcon className="w-4 h-4 text-tl-master-brand-green" />
                                             </button>
                                         )}
                                     </div>
@@ -1214,20 +1227,20 @@ export default function IndexDetailPage({ params }) {
                                             {[...domainLabels].map((label) => (
                                                 <span
                                                     key={label}
-                                                    className="group/chip flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/25 transition-colors"
+                                                    className="group/chip flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-tl-master-brand-lightest-emeraldgreen/15 text-tl-master-brand-dark-green dark:text-tl-master-brand-light-green border border-tl-master-brand-green/25 transition-colors"
                                                 >
                                                     {label}
                                                     <button
                                                         onClick={() => removeLabel(label)}
                                                         className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors cursor-pointer"
                                                     >
-                                                        <X className="w-3 h-3 text-primary-400 group-hover/chip:text-red-500" strokeWidth={2} />
+                                                        <CloseIcon className="w-3 h-3 text-tl-master-brand-light-green group-hover/chip:text-red-500" />
                                                     </button>
                                                 </span>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-[var(--text-tertiary)] italic">
+                                        <p className="text-xs text-foreground-subtle italic">
                                             No labels yet — add from AI suggestions below or type your own above.
                                         </p>
                                     )}
@@ -1235,21 +1248,21 @@ export default function IndexDetailPage({ params }) {
 
                                 {/* Divider + AI suggestions */}
                                 {(suggestedClasses || analyzingClasses || analyzeError) && (
-                                    <div className="border-t border-[var(--border)] bg-[var(--background)]/50 px-5 py-4">
+                                    <div className="border-t border-border-secondary bg-surface-card/50 px-5 py-4">
                                         <div className="flex items-center gap-2 mb-3">
-                                            <Sparkles className="w-3.5 h-3.5 text-primary-500" strokeWidth={1.5} />
-                                            <span className="text-xs font-medium text-[var(--text-secondary)]">
+                                            <IdeaIcon className="w-3.5 h-3.5 text-tl-master-brand-green" />
+                                            <span className="text-xs font-medium text-foreground-secondary">
                                                 AI Suggestions
                                             </span>
-                                            <span className="text-[10px] text-[var(--text-tertiary)]">
+                                            <span className="text-[10px] text-foreground-subtle">
                                                 powered by TwelveLabs Pegasus
                                             </span>
                                         </div>
 
                                         {analyzingClasses && (
                                             <div className="flex items-center gap-3 py-2">
-                                                <Loader2 className="w-4 h-4 text-primary-500 animate-spin" strokeWidth={2} />
-                                                <span className="text-sm text-[var(--text-secondary)]">Analyzing video content…</span>
+                                                <SpinnerIcon className="w-4 h-4 text-tl-master-brand-green animate-spin" />
+                                                <span className="text-sm text-foreground-secondary">Analyzing video content…</span>
                                             </div>
                                         )}
 
@@ -1258,7 +1271,7 @@ export default function IndexDetailPage({ params }) {
                                                 <span className="text-sm text-red-500 dark:text-red-400">Failed to analyze: {analyzeError}</span>
                                                 <button
                                                     onClick={() => runAnalysis(videos[0]?.id)}
-                                                    className="text-xs font-medium text-primary-500 hover:text-primary-400 cursor-pointer"
+                                                    className="text-xs font-medium text-tl-master-brand-green hover:text-tl-master-brand-light-green cursor-pointer"
                                                 >
                                                     Retry
                                                 </button>
@@ -1274,8 +1287,8 @@ export default function IndexDetailPage({ params }) {
                                                             key={i}
                                                             onClick={(e) => { e.stopPropagation(); isAdded ? removeLabel(cls) : addLabel(cls); }}
                                                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${isAdded
-                                                                ? 'bg-primary-500 text-gray-900 border-primary-500'
-                                                                : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)] hover:border-primary-400 hover:text-primary-500'
+                                                                ? 'bg-tl-master-brand-green text-gray-900 border-tl-master-brand-green'
+                                                                : 'bg-surface-white text-foreground-secondary border-border-secondary hover:border-tl-master-brand-light-green hover:text-tl-master-brand-green'
                                                                 }`}
                                                         >
                                                             {isAdded ? (
@@ -1285,7 +1298,7 @@ export default function IndexDetailPage({ params }) {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <PlusCircle className="w-3 h-3" strokeWidth={2} />
+                                                                    <PlusIcon className="w-3 h-3" />
                                                                     {cls}
                                                                 </>
                                                             )}
@@ -1302,7 +1315,7 @@ export default function IndexDetailPage({ params }) {
                         {/* Content */}
                         {loading && (
                             <div className="flex items-center justify-center py-20">
-                                <Loader2 className="w-6 h-6 text-[var(--text-tertiary)] animate-spin" strokeWidth={1.5} />
+                                <SpinnerIcon className="w-6 h-6 text-foreground-subtle animate-spin" />
                             </div>
                         )}
 
@@ -1337,35 +1350,35 @@ export default function IndexDetailPage({ params }) {
 
             {/* Sticky annotate bar */}
             {selectedStats.count > 0 && (
-                <div className="fixed bottom-0 left-0 lg:left-60 right-0 z-30 bg-[var(--surface)] border-t border-[var(--border)] shadow-[0_-4px_20px_rgba(0,0,0,0.08)] animate-fade-in">
+                <div className="fixed bottom-0 left-0 lg:left-60 right-0 z-30 bg-surface-white border-t border-border-secondary shadow-[0_-4px_20px_rgba(0,0,0,0.08)] animate-fade-in">
                     {/* Settings row */}
-                    <div className="border-b border-[var(--border)] px-4 lg:px-6 py-3">
+                    <div className="border-b border-border-secondary px-4 lg:px-6 py-3">
                         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
                             {/* Annotation density */}
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                                <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
                                     Annotation Density
                                 </span>
-                                <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+                                <div className="flex rounded-lg border border-border-secondary overflow-hidden">
                                     <button
                                         onClick={() => setAnnotationDensity('scene')}
                                         className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${annotationDensity === 'scene'
-                                            ? 'bg-primary-500/20 text-[var(--text-primary)] border-r border-[var(--border)]'
-                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-gray-800 border-r border-[var(--border)]'
+                                            ? 'bg-tl-master-brand-green/20 text-foreground-body border-r border-border-secondary'
+                                            : 'text-foreground-subtle hover:text-foreground-secondary hover:bg-gray-50 dark:hover:bg-gray-800 border-r border-border-secondary'
                                             }`}
                                     >
                                         Scene-level
-                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">~{ANNOTATION_SCENE_SLOT_SEC}s bins</span>
+                                        <span className="ml-1 text-[10px] text-foreground-subtle">~{ANNOTATION_SCENE_SLOT_SEC}s bins</span>
                                     </button>
                                     <button
                                         onClick={() => setAnnotationDensity('action')}
                                         className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${annotationDensity === 'action'
-                                            ? 'bg-primary-500/20 text-[var(--text-primary)]'
-                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-gray-800'
+                                            ? 'bg-tl-master-brand-green/20 text-foreground-body'
+                                            : 'text-foreground-subtle hover:text-foreground-secondary hover:bg-gray-50 dark:hover:bg-gray-800'
                                             }`}
                                     >
                                         Action-level
-                                        <span className="ml-1 text-[10px] text-[var(--text-tertiary)]">~{ANNOTATION_ACTION_SLOT_SEC}s bins</span>
+                                        <span className="ml-1 text-[10px] text-foreground-subtle">~{ANNOTATION_ACTION_SLOT_SEC}s bins</span>
                                     </button>
                                 </div>
                             </div>
@@ -1373,15 +1386,15 @@ export default function IndexDetailPage({ params }) {
                             {/* ROI stats */}
                             <div className="flex items-center gap-3 text-xs">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-[var(--text-tertiary)]">Manual:</span>
-                                    <span className="font-mono font-medium text-red-500 dark:text-red-400">
+                                    <span className="text-foreground-subtle">Manual:</span>
+                                    <span className="font-tl-mono font-medium text-red-500 dark:text-red-400">
                                         {formatDuration(roiStats.manualTimeSec)}
                                     </span>
                                 </div>
-                                <span className="text-[var(--text-tertiary)]">→</span>
+                                <span className="text-foreground-subtle">→</span>
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-[var(--text-tertiary)]">TwelveLabs:</span>
-                                    <span className="font-mono font-medium text-green-600 dark:text-green-400">
+                                    <span className="text-foreground-subtle">TwelveLabs:</span>
+                                    <span className="font-tl-mono font-medium text-green-600 dark:text-green-400">
                                         {formatDuration(roiStats.tlTimeSec)}
                                     </span>
                                 </div>
@@ -1397,25 +1410,25 @@ export default function IndexDetailPage({ params }) {
                         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
                             <div className="flex items-center gap-5">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                                    <span className="text-sm font-medium text-foreground-body">
                                         {selectedStats.count} video{selectedStats.count !== 1 ? 's' : ''} selected
                                     </span>
-                                    <span className="text-xs text-[var(--text-tertiary)] font-mono">
+                                    <span className="text-xs text-foreground-subtle font-tl-mono">
                                         {formatDuration(selectedStats.totalDuration)}
                                     </span>
                                 </div>
-                                <div className="h-4 w-px bg-[var(--border)]" />
+                                <div className="h-4 w-px bg-border-secondary" />
                                 <div className="flex items-center gap-2.5 text-xs">
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[var(--text-tertiary)]">Human:</span>
-                                        <span className="font-mono font-semibold text-red-500 dark:text-red-400">
+                                        <span className="text-foreground-subtle">Human:</span>
+                                        <span className="font-tl-mono font-semibold text-red-500 dark:text-red-400">
                                             ${roiStats.humanCost.toFixed(2)}
                                         </span>
                                     </div>
-                                    <span className="text-[var(--text-tertiary)]">→</span>
+                                    <span className="text-foreground-subtle">→</span>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[var(--text-tertiary)]">TwelveLabs:</span>
-                                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                                        <span className="text-foreground-subtle">TwelveLabs:</span>
+                                        <span className="font-tl-mono font-semibold text-green-600 dark:text-green-400">
                                             ${roiStats.tlCost.toFixed(2)}
                                         </span>
                                     </div>
@@ -1428,15 +1441,15 @@ export default function IndexDetailPage({ params }) {
                                 onClick={annotateVideos}
                                 disabled={annotating}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold text-gray-900 transition-all ${annotating ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:brightness-95'}`}
-                                style={{ background: 'linear-gradient(135deg, #D9F99D 0%, #FDE047 100%)' }}
+                                style={{ background: 'linear-gradient(135deg, var(--tl-color-master-brand-green) 0%, var(--tl-color-master-brand-orange) 100%)' }}
                             >
                                 {annotating ? (
                                     <span className="flex items-center gap-2">
-                                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
+                                        <SpinnerIcon className="w-4 h-4 animate-spin" />
                                         Annotating…
                                     </span>
                                 ) : (
-                                    <>Annotate {selectedStats.count} Video{selectedStats.count !== 1 ? 's' : ''}</>
+                                    <>Annotate {selectedStats.count} VideoIcon{selectedStats.count !== 1 ? 's' : ''}</>
                                 )}
                             </button>
                         </div>

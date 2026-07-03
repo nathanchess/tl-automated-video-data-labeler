@@ -1,75 +1,84 @@
 @import "tailwindcss";
+@import "@twelvelabs-io/react/tokens.css";
+@import "@twelvelabs-io/react/theme.css";
 
-@theme {
-    --color-primary-50: #F7FEE7;
-    --color-primary-100: #ECFCCB;
-    --color-primary-200: #D9F99D;
-    --color-primary-300: #BEF264;
-    --color-primary-400: #A3E635;
-    --color-primary-500: #84CC16;
-    --color-primary-600: #65A30D;
-    --color-primary-700: #4D7C0F;
-
-    --color-secondary-50: #FFFBEB;
-    --color-secondary-100: #FEF3C7;
-    --color-secondary-200: #FDE68A;
-    --color-secondary-300: #FCD34D;
-    --color-secondary-400: #FBBF24;
-    --color-secondary-500: #F59E0B;
-    --color-secondary-600: #D97706;
-
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-
-    --radius-card: 1rem;
-
-    --shadow-card: 0 6px 14px rgba(0, 0, 0, 0.05);
-    --shadow-card-hover: 0 12px 24px rgba(0, 0, 0, 0.08);
-}
-
-/* ─── Light mode (default) ─── */
+/* Soft light-gray chrome borders (never hard dark lines). */
 :root {
-    --bg: #FFFFFF;
-    --surface: #FFFFFF;
-    --text-primary: #111827;
-    --text-secondary: #6B7280;
-    --text-tertiary: #9CA3AF;
-    --border: #E5E7EB;
-    --glass-overlay: rgba(255, 255, 255, 0.8);
-    --shadow-ambient: rgba(0, 0, 0, 0.08);
+    --tl-border-primary: var(--tl-color-gray-300);
+    --tl-border-secondary: var(--tl-color-gray-300);
+    --tl-misc-border-medium: var(--tl-color-gray-300);
 }
 
-/* ─── Dark mode ─── */
+/* Accessible dark surfaces; borders stay light gray. */
 .dark {
-    --bg: #18181B;
-    --surface: #1F2937;
-    --text-primary: #FAFAFA;
-    --text-secondary: #A1A1AA;
-    --text-tertiary: #71717A;
-    --border: #27272A;
-    --glass-overlay: rgba(24, 24, 27, 0.8);
-    --shadow-ambient: rgba(0, 0, 0, 0.3);
+    --tl-surface-body: #1d1c1b;
+    --tl-surface-white: #2a2826;
+    --tl-surface-card: #3a3734;
+    --tl-surface-secondary: #45423f;
+    --tl-surface-secondary-hover: #52504c;
+    --tl-surface-primary: #f4f3f3;
+    --tl-surface-primary-inverse: #1d1c1b;
+    --tl-surface-primary-hover: #ececec;
+    --tl-surface-tooltip: #45423f;
+    --tl-foreground-body: #f4f3f3;
+    --tl-foreground-primary: #1d1c1b;
+    --tl-foreground-primary-inverse: #f4f3f3;
+    --tl-foreground-secondary: #d3d1cf;
+    --tl-foreground-muted: #bdbcbb;
+    --tl-foreground-subtle: #8f8984;
+    --tl-foreground-disabled: #8f8984;
+    --tl-foreground-tooltip: #f4f3f3;
+    --tl-border-primary: var(--tl-color-gray-300);
+    --tl-border-secondary: var(--tl-color-gray-400);
+    --tl-misc-border-light: var(--tl-color-gray-400);
+    --tl-misc-border-medium: var(--tl-color-gray-400);
+    --tl-misc-ring: var(--tl-color-gray-300);
+    --tl-misc-overlay: rgb(0 0 0 / 0.45);
 }
 
-/* ─── Base resets ─── */
+@layer base {
+    html {
+        @apply font-tl-sans antialiased;
+    }
+
+    body {
+        @apply bg-surface-body text-foreground-body font-tl-sans;
+    }
+
+    a[href],
+    button:not(:disabled),
+    [role="button"]:not([aria-disabled="true"]),
+    label[for],
+    select,
+    summary {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled="true"] {
+        cursor: not-allowed;
+    }
+}
+
 * {
     box-sizing: border-box;
 }
 
-body {
-    background-color: var(--bg);
-    color: var(--text-primary);
-    font-family: var(--font-sans);
-    transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* ─── Gradient utilities ─── */
+/* Brand gradient utilities (tl master brand green → orange) */
 .gradient-bg {
-    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    background: linear-gradient(
+        135deg,
+        var(--tl-color-master-brand-green) 0%,
+        var(--tl-color-master-brand-orange) 100%
+    );
 }
 
 .gradient-text {
-    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    background: linear-gradient(
+        135deg,
+        var(--tl-color-master-brand-green) 0%,
+        var(--tl-color-master-brand-orange) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -77,8 +86,12 @@ body {
 
 .gradient-border {
     border: 1px solid transparent;
-    background-image: linear-gradient(var(--surface), var(--surface)),
-        linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    background-image: linear-gradient(var(--tl-surface-white), var(--tl-surface-white)),
+        linear-gradient(
+            135deg,
+            var(--tl-color-master-brand-green) 0%,
+            var(--tl-color-master-brand-orange) 100%
+        );
     background-origin: border-box;
     background-clip: padding-box, border-box;
 }
@@ -88,30 +101,32 @@ body {
 }
 
 .gradient-wash::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, #D9F99D 0%, #FDE047 100%);
+    background: linear-gradient(
+        135deg,
+        var(--tl-color-master-brand-green) 0%,
+        var(--tl-color-master-brand-orange) 100%
+    );
     opacity: 0.1;
     border-radius: inherit;
     pointer-events: none;
 }
 
 .dark .gradient-wash::before {
-    opacity: 0.06;
+    opacity: 0.08;
 }
 
-/* ─── Card lift interaction ─── */
 .card-lift {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-lift:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-card-hover);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 0.08);
 }
 
-/* ─── Scrollbar styling ─── */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -121,17 +136,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--tl-border-secondary);
     border-radius: 9999px;
 }
 
-/* ─── Pop-in animations ─── */
 @keyframes pop-in {
     from {
         opacity: 0;
         transform: scale(0.9);
     }
-
     to {
         opacity: 1;
         transform: scale(1);
@@ -142,7 +155,6 @@ body {
     from {
         opacity: 0;
     }
-
     to {
         opacity: 1;
     }
@@ -160,7 +172,58 @@ body {
     animation: pop-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* Upload modal: hide Chrome/WebKit hover overlays (PiP, translate, etc.) on preview <video> */
+/* VS Code Dark+ token colors for overview code blocks */
+.vscode-code {
+    --vscode-bg: #1e1e1e;
+    --vscode-fg: #d4d4d4;
+    --vscode-comment: #6a9955;
+    --vscode-keyword: #569cd6;
+    --vscode-control: #c586c0;
+    --vscode-string: #ce9178;
+    --vscode-number: #b5cea8;
+    --vscode-function: #dcdcaa;
+    --vscode-type: #4ec9b0;
+    --vscode-property: #9cdcfe;
+    --vscode-operator: #d4d4d4;
+    --vscode-punctuation: #d4d4d4;
+    --vscode-line-number: #858585;
+    background: var(--vscode-bg);
+    color: var(--vscode-fg);
+    font-family: var(--font-tl-mono);
+}
+
+.vscode-code .tok-comment {
+    color: var(--vscode-comment);
+    font-style: italic;
+}
+.vscode-code .tok-keyword {
+    color: var(--vscode-keyword);
+}
+.vscode-code .tok-control {
+    color: var(--vscode-control);
+}
+.vscode-code .tok-string {
+    color: var(--vscode-string);
+}
+.vscode-code .tok-number {
+    color: var(--vscode-number);
+}
+.vscode-code .tok-function {
+    color: var(--vscode-function);
+}
+.vscode-code .tok-type {
+    color: var(--vscode-type);
+}
+.vscode-code .tok-property {
+    color: var(--vscode-property);
+}
+.vscode-code .tok-operator {
+    color: var(--vscode-operator);
+}
+.vscode-code .tok-punctuation {
+    color: var(--vscode-punctuation);
+}
+
 .upload-modal-preview-video::-webkit-media-controls {
     display: none !important;
 }

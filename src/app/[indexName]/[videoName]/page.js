@@ -2,7 +2,16 @@
 
 import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Clock, Eye, Tag, Activity, Shield, Play } from 'lucide-react';
+import {
+    ArrowLeftIcon,
+    SpinnerIcon,
+    HistoryIcon,
+    VisionIcon,
+    EntityIcon,
+    AnalyzeIcon,
+    ScalableIcon,
+    PlayIcon,
+} from '@twelvelabs-io/react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import AnnotationEditor from '@/components/dashboard/AnnotationEditor';
 import Hls from 'hls.js';
@@ -50,6 +59,18 @@ function computeSceneBarSpans(annotations, durationSec) {
         .filter((s) => s.displayEnd > s.displayStart);
 }
 
+/** Resolve playback URL from annotation / session payloads (snake or camel case). */
+function resolvePlaybackUrl(data) {
+    if (!data) return null;
+    return (
+        data.hls?.video_url ||
+        data.hls?.videoUrl ||
+        data.video_url ||
+        data.videoUrl ||
+        null
+    );
+}
+
 export default function VideoAnnotationPage({ params }) {
     const { indexName, videoName } = use(params);
     const decodedIndex = decodeURIComponent(indexName);
@@ -64,64 +85,133 @@ export default function VideoAnnotationPage({ params }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [hoverTime, setHoverTime] = useState(null);
     const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState(null);
+    const [mediaReady, setMediaReady] = useState(false);
 
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
 
-    // Load annotation data
+    // Load annotation data + playback URL (localStorage, then session handoff from list)
     useEffect(() => {
         const storageKey = `annotations_${decodedIndex}_${decodedVideo}`;
+        const playbackKey = `video_playback_${decodedIndex}_${decodedVideo}`;
+        let url = null;
+        let durationSec = 0;
+
         try {
             const stored = localStorage.getItem(storageKey);
             if (stored) {
                 const data = JSON.parse(stored);
                 setAnnotationData(data);
-                if (data.hls?.video_url) {
-                    setVideoUrl(data.hls.video_url);
-                }
-                if (data.systemMetadata?.duration) {
-                    setDuration(data.systemMetadata.duration);
-                }
+                url = resolvePlaybackUrl(data);
+                durationSec = data.systemMetadata?.duration || 0;
             }
         } catch (e) {
             console.error('Failed to load annotations:', e);
         }
+
+        if (!url) {
+            try {
+                const handoff = localStorage.getItem(playbackKey);
+                if (handoff) {
+                    const data = JSON.parse(handoff);
+                    url = resolvePlaybackUrl(data) || data.url || null;
+                    if (!durationSec && data.duration) durationSec = data.duration;
+                }
+            } catch (e) {
+                console.warn('Failed to read playback handoff:', e);
+            }
+        }
+
+        if (url) {
+            setVideoUrl(url);
+            // Backfill missing hls on stored annotations so later visits still play.
+            try {
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    if (!resolvePlaybackUrl(data)) {
+                        localStorage.setItem(
+                            storageKey,
+                            JSON.stringify({
+                                ...data,
+                                hls: data.hls || { video_url: url },
+                                video_url: url,
+                            }),
+                        );
+                    }
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        if (durationSec) setDuration(durationSec);
         setLoading(false);
     }, [decodedIndex, decodedVideo]);
 
-    // Initialize HLS
+    // Initialize HLS once the <video> element is mounted
     useEffect(() => {
-        if (!videoUrl) return;
-        const video = videoRef.current;
-        if (!video) return;
+        if (!videoUrl || loading) return;
 
-        if (Hls.isSupported()) {
-            if (hlsRef.current) hlsRef.current.destroy();
+        let cancelled = false;
+        let rafId = 0;
 
-            const hls = new Hls({
-                enableWorker: false,
-                lowLatencyMode: false,
-            });
+        const attach = () => {
+            const video = videoRef.current;
+            if (!video) {
+                rafId = requestAnimationFrame(attach);
+                return;
+            }
+            if (cancelled) return;
 
-            hls.loadSource(videoUrl);
-            hls.attachMedia(video);
-            hlsRef.current = hls;
+            setMediaReady(false);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                // Ready to play
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS (Safari)
-            video.src = videoUrl;
-        }
+            if (hlsRef.current) {
+                hlsRef.current.destroy();
+                hlsRef.current = null;
+            }
+
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    enableWorker: false,
+                    lowLatencyMode: false,
+                });
+
+                hls.loadSource(videoUrl);
+                hls.attachMedia(video);
+                hlsRef.current = hls;
+
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (!cancelled) setMediaReady(true);
+                });
+                hls.on(Hls.Events.ERROR, (_event, data) => {
+                    if (!data?.fatal || cancelled) return;
+                    console.error('HLS error:', data);
+                    // Last-resort: try native src (some environments recover)
+                    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                        video.src = videoUrl;
+                        setMediaReady(true);
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = videoUrl;
+                setMediaReady(true);
+            } else {
+                video.src = videoUrl;
+                setMediaReady(true);
+            }
+        };
+
+        attach();
 
         return () => {
+            cancelled = true;
+            if (rafId) cancelAnimationFrame(rafId);
             if (hlsRef.current) {
                 hlsRef.current.destroy();
                 hlsRef.current = null;
             }
         };
-    }, [videoUrl]);
+    }, [videoUrl, loading]);
 
     const handleSeek = (timeInSeconds) => {
         if (videoRef.current) {
@@ -141,18 +231,6 @@ export default function VideoAnnotationPage({ params }) {
     const handleLoadedMetadata = () => {
         if (videoRef.current && !duration) {
             setDuration(videoRef.current.duration);
-        }
-    };
-
-    const handlePlayPause = () => {
-        if (videoRef.current) {
-            if (videoRef.current.paused) {
-                videoRef.current.play();
-                setIsPlaying(true);
-            } else {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            }
         }
     };
 
@@ -230,24 +308,24 @@ export default function VideoAnnotationPage({ params }) {
                 <div className="mb-6">
                     <button
                         onClick={() => router.push(`/${encodeURIComponent(decodedIndex)}`)}
-                        className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mb-4 cursor-pointer"
+                        className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-foreground-body transition-colors mb-4 cursor-pointer"
                     >
-                        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
+                        <ArrowLeftIcon className="w-4 h-4" />
                         Back to {decodedIndex}
                     </button>
 
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-[var(--text-primary)] break-all">
+                            <h1 className="text-2xl font-bold text-foreground-body break-all">
                                 {decodedVideo}
                             </h1>
-                            <p className="text-sm text-[var(--text-secondary)] mt-1">
+                            <p className="text-sm text-foreground-secondary mt-1">
                                 Annotation results & video playback
                             </p>
                         </div>
                         {annotationData?.annotatedAt && (
-                            <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] bg-[var(--surface)] px-3 py-1.5 rounded-lg border border-[var(--border)]">
-                                <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            <div className="flex items-center gap-2 text-xs text-foreground-subtle bg-surface-white px-3 py-1.5 rounded-lg border border-border-secondary">
+                                <HistoryIcon className="w-3.5 h-3.5" />
                                 <span suppressHydrationWarning>Annotated {new Date(annotationData.annotatedAt).toLocaleString()}</span>
                             </div>
                         )}
@@ -257,22 +335,22 @@ export default function VideoAnnotationPage({ params }) {
                 {/* Content */}
                 {loading && (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-8 h-8 text-[var(--text-tertiary)] animate-spin" strokeWidth={1.5} />
+                        <SpinnerIcon className="w-8 h-8 text-foreground-subtle animate-spin" />
                     </div>
                 )}
 
                 {!loading && !annotationData && (
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-12 text-center max-w-lg mx-auto mt-10">
-                        <Eye className="w-12 h-12 text-[var(--text-tertiary)] mx-auto mb-4" strokeWidth={1} />
-                        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                    <div className="rounded-2xl border border-border-secondary bg-surface-white p-12 text-center max-w-lg mx-auto mt-10">
+                        <VisionIcon className="w-12 h-12 text-foreground-subtle mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-foreground-body mb-2">
                             No annotations found
                         </h3>
-                        <p className="text-sm text-[var(--text-secondary)] mb-6">
+                        <p className="text-sm text-foreground-secondary mb-6">
                             This video hasn't been annotated securely yet or the data is missing.
                         </p>
                         <button
                             onClick={() => router.push(`/${encodeURIComponent(decodedIndex)}`)}
-                            className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+                            className="px-4 py-2 bg-tl-master-brand-green text-white rounded-lg text-sm font-medium hover:bg-tl-master-brand-dark-green transition-colors"
                         >
                             Go back to list
                         </button>
@@ -284,29 +362,38 @@ export default function VideoAnnotationPage({ params }) {
 
                         {/* LEFT COLUMN: Player & Timeline */}
                         <div className="xl:col-span-2 space-y-4">
-                            <div className="rounded-2xl overflow-hidden bg-black border border-[var(--border)] shadow-lg aspect-video relative group">
+                            <div className="relative aspect-video overflow-hidden rounded-2xl border border-border-secondary bg-black shadow-lg">
                                 {videoUrl ? (
-                                    <video
-                                        ref={videoRef}
-                                        className="w-full h-full object-contain cursor-pointer"
-                                        controls
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onLoadedMetadata={handleLoadedMetadata}
-                                        onPlay={() => setIsPlaying(true)}
-                                        onPause={() => setIsPlaying(false)}
-                                    />
+                                    <>
+                                        <video
+                                            ref={videoRef}
+                                            className="h-full w-full object-contain"
+                                            controls
+                                            playsInline
+                                            preload="auto"
+                                            onTimeUpdate={handleTimeUpdate}
+                                            onLoadedMetadata={handleLoadedMetadata}
+                                            onPlay={() => setIsPlaying(true)}
+                                            onPause={() => setIsPlaying(false)}
+                                        />
+                                        {!mediaReady && (
+                                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
+                                                <SpinnerIcon className="size-8 animate-spin text-white/80" />
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--text-tertiary)]">
-                                        <Play className="w-12 h-12 mb-2 opacity-50" />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-foreground-subtle">
+                                        <PlayIcon className="mb-2 size-12 opacity-50" />
                                         <p className="text-sm">Video URL not available in stored data</p>
-                                        <p className="text-xs opacity-70 mt-1">Try re-annotating this video</p>
+                                        <p className="mt-1 text-xs opacity-70">Try re-annotating this video</p>
                                     </div>
                                 )}
                             </div>
 
                             {/* Detailed Interactive Timeline */}
                             <div
-                                className="relative h-24 w-full bg-[var(--background)] rounded-lg border border-[var(--border)] select-none cursor-crosshair group overflow-hidden"
+                                className="relative h-24 w-full bg-surface-card rounded-lg border border-border-secondary select-none cursor-crosshair group overflow-hidden"
                                 onMouseMove={(e) => {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const x = e.clientX - rect.left;
@@ -327,7 +414,7 @@ export default function VideoAnnotationPage({ params }) {
                                         className="absolute top-0 bottom-0 w-px bg-red-500 z-50 pointer-events-none"
                                         style={{ left: `${(hoverTime / (duration || 1)) * 100}%` }}
                                     >
-                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
+                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-tl-mono">
                                             {formatTime(hoverTime)}
                                         </div>
                                     </div>
@@ -336,7 +423,7 @@ export default function VideoAnnotationPage({ params }) {
                                 {/* Grid lines (every 5 seconds) */}
                                 <div className="absolute inset-0 pointer-events-none opacity-10">
                                     {Array.from({ length: Math.ceil((duration || 1) / 5) }).map((_, i) => (
-                                        <div key={i} className="absolute top-0 bottom-0 border-l border-[var(--text-primary)]" style={{ left: `${(i * 5 / (duration || 1)) * 100}%` }} />
+                                        <div key={i} className="absolute top-0 bottom-0 border-l border-border-secondary" style={{ left: `${(i * 5 / (duration || 1)) * 100}%` }} />
                                     ))}
                                 </div>
 
@@ -470,7 +557,7 @@ export default function VideoAnnotationPage({ params }) {
 
                             {/* Legend / Help */}
                             <div className="mt-4">
-                                <div className="text-[10px] text-[var(--text-tertiary)] flex flex-wrap gap-x-4 gap-y-2 mb-2">
+                                <div className="text-[10px] text-foreground-subtle flex flex-wrap gap-x-4 gap-y-2 mb-2">
                                     <span>Hover segments for details • Click to jump</span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -482,7 +569,7 @@ export default function VideoAnnotationPage({ params }) {
                                             ann.detected_actions?.forEach(a => uniqueLabels.add(a.action || a.label || a.name));
                                         });
                                         return Array.from(uniqueLabels).map(label => (
-                                            <div key={label} className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-1 rounded border border-[var(--border)]">
+                                            <div key={label} className="flex items-center gap-1.5 text-[10px] text-foreground-secondary bg-surface-white px-2 py-1 rounded border border-border-secondary">
                                                 <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: stringToColor(label) }} />
                                                 <span className="font-medium">{label}</span>
                                             </div>
@@ -507,10 +594,10 @@ export default function VideoAnnotationPage({ params }) {
                         <div className="xl:col-span-1">
                             <div className="sticky top-6 flex flex-col h-[calc(100vh-6rem)]">
                                 <div className="mb-3 flex items-center justify-between">
-                                    <h2 className="font-semibold text-[var(--text-primary)]">
+                                    <h2 className="font-semibold text-foreground-body">
                                         Annotations ({annotationData.annotations?.length || 0})
                                     </h2>
-                                    <span className="text-xs text-[var(--text-tertiary)]">
+                                    <span className="text-xs text-foreground-subtle">
                                         Scroll to view all
                                     </span>
                                 </div>
@@ -535,8 +622,8 @@ export default function VideoAnnotationPage({ params }) {
 
                                         // Green/White Theme when active
                                         const activeClass = isActive
-                                            ? 'shadow-lg border-lime-500 bg-[var(--surface)]'
-                                            : 'border-[var(--border)] hover:border-[var(--text-secondary)] bg-[var(--surface)]';
+                                            ? 'shadow-lg border-lime-500 bg-surface-white'
+                                            : 'border-border-secondary hover:border-border-secondary bg-surface-white';
 
                                         return (
                                             <div
@@ -560,8 +647,8 @@ export default function VideoAnnotationPage({ params }) {
                                                 {/* Header */}
                                                 <div className="flex items-center justify-between mb-2 pl-2">
                                                     <span className={`
-                                                        px-2 py-0.5 rounded text-xs font-mono font-bold
-                                                        ${isActive ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-[var(--background)] text-[var(--text-secondary)]'}
+                                                        px-2 py-0.5 rounded text-xs font-tl-mono font-bold
+                                                        ${isActive ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-surface-card text-foreground-secondary'}
                                                     `}>
                                                         {formatTime(startSeconds)} - {formatTime(endSeconds)}
                                                     </span>
@@ -578,7 +665,7 @@ export default function VideoAnnotationPage({ params }) {
                                                     )}
                                                 </div>
 
-                                                <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-3 leading-relaxed group-hover:text-[var(--text-primary)] transition-colors pl-2">
+                                                <p className="text-xs text-foreground-secondary line-clamp-3 mb-3 leading-relaxed group-hover:text-foreground-body transition-colors pl-2">
                                                     {ann.description || 'No description'}
                                                 </p>
 
@@ -625,10 +712,10 @@ export default function VideoAnnotationPage({ params }) {
 
                                     {/* Raw Data Toggle */}
                                     <details className="pt-4">
-                                        <summary className="text-xs text-[var(--text-tertiary)] cursor-pointer hover:underline">
+                                        <summary className="text-xs text-foreground-subtle cursor-pointer hover:underline">
                                             View Raw JSON
                                         </summary>
-                                        <pre className="mt-2 text-[10px] bg-[var(--background)] p-2 rounded border border-[var(--border)] overflow-x-auto">
+                                        <pre className="mt-2 text-[10px] bg-surface-card p-2 rounded border border-border-secondary overflow-x-auto">
                                             {JSON.stringify(annotationData, null, 2)}
                                         </pre>
                                     </details>

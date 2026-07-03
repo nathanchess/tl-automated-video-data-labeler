@@ -3,36 +3,37 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
-    Home,
-    Folder,
-    FileText,
-    HelpCircle,
-    ChevronLeft,
-    Menu,
-    X,
-    ExternalLink,
-    Github,
-    Video,
-    Tag,
-    Database,
-    Download,
-    Search,
-    Image as ImageIcon,
-} from 'lucide-react';
-import Image from 'next/image';
+    HomeIcon,
+    IndexesIcon,
+    TextIcon,
+    HelpIcon,
+    ChevronLeftIcon,
+    MenuIcon,
+    CloseIcon,
+    ArrowDiagonalIcon,
+    IntegrationIcon,
+    VideoIcon,
+    EntityIcon,
+    ServersIcon,
+    DownloadIcon,
+    SearchIcon,
+    Chip,
+    TwelveLabsLogo,
+    TwelveLabsLogoMark,
+} from '@twelvelabs-io/react';
 import Link from 'next/link';
 
 const NAV_ITEMS = [
-    { label: 'Overview', icon: Home, href: '/' },
-    { label: 'Indexes', icon: Folder, href: '/indexes' },
+    { label: 'Overview', icon: HomeIcon, href: '/' },
+    { label: 'Indexes', icon: IndexesIcon, href: '/indexes' },
 ];
 
 function NavItem({ label, icon: Icon, active = false, collapsed = false, onClick, href, external }) {
     const cls = `
         flex items-center gap-3 px-6 py-2.5 text-sm transition-colors rounded-r-lg w-full
         ${active
-            ? 'font-semibold text-[var(--text-primary)] gradient-wash'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 dark:hover:bg-gray-800'
+            ? 'font-semibold text-foreground-body gradient-wash'
+            : 'text-foreground-secondary hover:text-foreground-body hover:bg-surface-card'
         }
         ${collapsed ? 'justify-center px-3' : ''}
     `;
@@ -46,11 +47,11 @@ function NavItem({ label, icon: Icon, active = false, collapsed = false, onClick
                     rel="noopener noreferrer"
                     className={cls}
                 >
-                    <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                    <Icon className="w-5 h-5 shrink-0" />
                     {!collapsed && (
                         <span className="flex items-center gap-2">
                             {label}
-                            <ExternalLink className="w-3 h-3 opacity-50" strokeWidth={2} />
+                            <ArrowDiagonalIcon className="w-3 h-3 opacity-50" />
                         </span>
                     )}
                 </a>
@@ -65,7 +66,7 @@ function NavItem({ label, icon: Icon, active = false, collapsed = false, onClick
                     <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full gradient-bg" />
                 )}
                 <Link href={href} className={cls}>
-                    <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                    <Icon className="w-5 h-5 shrink-0" />
                     {!collapsed && <span>{label}</span>}
                 </Link>
             </li>
@@ -81,7 +82,7 @@ function NavItem({ label, icon: Icon, active = false, collapsed = false, onClick
                 onClick={onClick}
                 className={cls + ' cursor-pointer text-left'}
             >
-                <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                <Icon className="w-5 h-5 shrink-0" />
                 {!collapsed && <span>{label}</span>}
             </button>
         </li>
@@ -97,7 +98,7 @@ function HelpModal({ open, onClose }) {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
             {/* Modal */}
-            <div className="relative w-full max-w-lg mx-4 bg-[var(--surface)] rounded-2xl border border-[var(--border)] shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+            <div className="relative w-full max-w-lg mx-4 bg-surface-white rounded-2xl border border-border-secondary shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 pt-6 pb-4">
                     <div className="flex items-center gap-3">
@@ -107,25 +108,25 @@ function HelpModal({ open, onClose }) {
                             className="h-10 w-auto rounded-xl object-contain"
                         />
                         <div>
-                            <h2 className="text-lg font-bold text-[var(--text-primary)]">
+                            <h2 className="text-lg font-bold text-foreground-body">
                                 Automated Video Data Labeler
                             </h2>
-                            <p className="text-xs text-[var(--text-tertiary)]">
+                            <p className="text-xs text-foreground-subtle">
                                 Powered by TwelveLabs
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg hover:bg-surface-card transition-colors cursor-pointer"
                     >
-                        <X className="w-5 h-5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                        <CloseIcon className="w-5 h-5 text-foreground-subtle" />
                     </button>
                 </div>
 
                 {/* Description */}
                 <div className="px-6 pb-4">
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                    <p className="text-sm text-foreground-secondary leading-relaxed">
                         Automatically generate structured training data labels for your video datasets using TwelveLabs' multimodal AI.
                         Replace manual video annotation workflows with AI-powered labeling that's faster, cheaper, and more consistent.
                     </p>
@@ -133,56 +134,38 @@ function HelpModal({ open, onClose }) {
 
                 {/* Core Features */}
                 <div className="px-6 pb-5">
-                    <h3 className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-3">
+                    <h3 className="text-xs font-semibold text-foreground-subtle uppercase tracking-wider mb-3">
                         Core Features
                     </h3>
                     <ul className="space-y-2.5">
                         {[
-                            { icon: Video, text: 'Upload and organize video datasets into indexes' },
-                            { icon: Tag, text: 'AI-powered annotation with customizable label taxonomies' },
-                            { icon: Search, text: 'Semantic search across video content and moments' },
-                            { icon: Database, text: '2D embedding visualization with PCA clustering' },
-                            { icon: Download, text: 'Export annotations in COCO, YOLO, or CSV formats' },
+                            { icon: VideoIcon, text: 'Upload and organize video datasets into indexes' },
+                            { icon: EntityIcon, text: 'AI-powered annotation with customizable label taxonomies' },
+                            { icon: SearchIcon, text: 'Semantic search across video content and moments' },
+                            { icon: ServersIcon, text: '2D embedding visualization with PCA clustering' },
+                            { icon: DownloadIcon, text: 'Export annotations in COCO, YOLO, or CSV formats' },
                         ].map(({ icon: FIcon, text }) => (
                             <li key={text} className="flex items-start gap-3">
-                                <div className="p-1 rounded-md bg-gray-100 dark:bg-gray-800 shrink-0 mt-0.5">
-                                    <FIcon className="w-3.5 h-3.5 text-[var(--text-secondary)]" strokeWidth={1.5} />
+                                <div className="p-1 rounded-md bg-surface-card shrink-0 mt-0.5">
+                                    <FIcon className="w-3.5 h-3.5 text-foreground-secondary" />
                                 </div>
-                                <span className="text-sm text-[var(--text-primary)]">{text}</span>
+                                <span className="text-sm text-foreground-body">{text}</span>
                             </li>
                         ))}
                     </ul>
                 </div>
 
-                {/* Placeholders */}
-                <div className="px-6 pb-5 space-y-3">
-                    <div className="rounded-xl border border-dashed border-[var(--border)] bg-gray-50 dark:bg-gray-800/50 p-4 flex items-center gap-3">
-                        <ImageIcon className="w-5 h-5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-                        <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Architecture Diagram</p>
-                            <p className="text-xs text-[var(--text-tertiary)]">To be added</p>
-                        </div>
-                    </div>
-                    <div className="rounded-xl border border-dashed border-[var(--border)] bg-gray-50 dark:bg-gray-800/50 p-4 flex items-center gap-3">
-                        <Video className="w-5 h-5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-                        <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Demo Video</p>
-                            <p className="text-xs text-[var(--text-tertiary)]">To be added</p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Footer with GitHub link */}
-                <div className="px-6 py-4 border-t border-[var(--border)] bg-gray-50/50 dark:bg-gray-800/30">
+                <div className="px-6 py-4 border-t border-border-secondary bg-surface-card/50">
                     <a
                         href="https://github.com/nathanchess/tl-automated-video-data-labeler"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                        className="flex items-center gap-2.5 text-sm font-medium text-foreground-secondary hover:text-foreground-body transition-colors"
                     >
-                        <Github className="w-4.5 h-4.5" strokeWidth={1.5} />
+                        <IntegrationIcon className="w-4.5 h-4.5" />
                         <span>View Source Code on GitHub</span>
-                        <ExternalLink className="w-3 h-3 opacity-50 ml-auto" strokeWidth={2} />
+                        <ArrowDiagonalIcon className="w-3 h-3 opacity-50 ml-auto" />
                     </a>
                 </div>
             </div>
@@ -201,34 +184,25 @@ export default function Sidebar() {
             {/* Brand */}
             <div className="flex flex-col items-center px-6 py-5 gap-3">
                 {collapsed ? (
-                    <Image
-                        src="/TwelveLabs-Symbol.png"
-                        alt="TwelveLabs"
-                        width={56}
-                        height={40}
-                        className="rounded-md object-contain"
-                    />
+                    <TwelveLabsLogoMark className="size-10" />
                 ) : (
-                    <Image
-                        src="/twelvelabs_logo.jpg"
-                        alt="TwelveLabs"
-                        width={160}
-                        height={160}
-                        className="rounded-lg"
-                    />
+                    <TwelveLabsLogo className="h-10 max-w-[160px]" />
                 )}
-                <span
-                    title={collapsed ? 'Demo App' : undefined}
-                    className={`
-                        gradient-border gradient-wash inline-flex items-center justify-center
-                        rounded-lg font-semibold uppercase tracking-wider
-                        text-primary-700 dark:text-primary-300
-                        bg-primary-50/90 dark:bg-primary-500/10
-                        ${collapsed ? 'w-8 h-8 text-[10px]' : 'px-3 py-1.5 text-[11px]'}
-                    `}
-                >
-                    {collapsed ? 'D' : 'Demo App'}
-                </span>
+                {collapsed ? (
+                    <Chip
+                        variant="gray-outline"
+                        size="sm"
+                        uppercase
+                        title="Demo App"
+                        className="tracking-wider"
+                    >
+                        D
+                    </Chip>
+                ) : (
+                    <Chip variant="gray-outline" size="sm" uppercase className="tracking-wider">
+                        Demo App
+                    </Chip>
+                )}
             </div>
 
             {/* Main nav */}
@@ -247,18 +221,18 @@ export default function Sidebar() {
             </nav>
 
             {/* Bottom actions */}
-            <div className="border-t border-[var(--border)] pt-2 pb-4">
+            <div className="border-t border-border-secondary pt-2 pb-4">
                 <ul className="space-y-0.5">
                     <NavItem
                         label="API Docs"
-                        icon={FileText}
+                        icon={TextIcon}
                         collapsed={collapsed}
                         external
                         href="https://docs.twelvelabs.io/docs/get-started/introduction"
                     />
                     <NavItem
                         label="Help"
-                        icon={HelpCircle}
+                        icon={HelpIcon}
                         collapsed={collapsed}
                         onClick={() => setHelpOpen(true)}
                     />
@@ -266,11 +240,10 @@ export default function Sidebar() {
                 {/* Collapse toggle — desktop only */}
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="hidden lg:flex items-center gap-3 px-6 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors w-full cursor-pointer"
+                    className="hidden lg:flex items-center gap-3 px-6 py-2.5 text-sm text-foreground-secondary hover:text-foreground-body transition-colors w-full cursor-pointer"
                 >
-                    <ChevronLeft
+                    <ChevronLeftIcon
                         className={`w-5 h-5 shrink-0 transition-transform ${collapsed ? 'rotate-180' : ''}`}
-                        strokeWidth={1.5}
                     />
                     {!collapsed && <span>Collapse</span>}
                 </button>
@@ -283,10 +256,10 @@ export default function Sidebar() {
             {/* Mobile hamburger */}
             <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-card cursor-pointer"
+                className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-surface-white border border-border-secondary shadow-card cursor-pointer"
                 aria-label="Open menu"
             >
-                <Menu className="w-5 h-5 text-[var(--text-primary)]" strokeWidth={1.5} />
+                <MenuIcon className="w-5 h-5 text-foreground-body" />
             </button>
 
             {/* Mobile overlay */}
@@ -301,7 +274,7 @@ export default function Sidebar() {
             <aside
                 className={`
                     fixed left-0 top-0 h-screen z-40
-                    bg-[var(--surface)] border-r border-[var(--border)]
+                    bg-surface-white border-r border-border-secondary
                     transition-all duration-300 ease-in-out
                     ${collapsed ? 'w-16' : 'w-60'}
                     ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -312,10 +285,10 @@ export default function Sidebar() {
                 {mobileOpen && (
                     <button
                         onClick={() => setMobileOpen(false)}
-                        className="lg:hidden absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                        className="lg:hidden absolute top-4 right-4 p-1 rounded-lg hover:bg-surface-card cursor-pointer"
                         aria-label="Close menu"
                     >
-                        <X className="w-5 h-5 text-[var(--text-primary)]" strokeWidth={1.5} />
+                        <CloseIcon className="w-5 h-5 text-foreground-body" />
                     </button>
                 )}
 

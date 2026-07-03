@@ -35,7 +35,7 @@ export default function IndexGrid({ sortBy, filterQuery, onCreateIndex, indexes,
                 Array.from({ length: 3 }).map((_, i) => (
                     <div
                         key={i}
-                        className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden animate-pulse"
+                        className="rounded-2xl bg-surface-white border border-border-secondary overflow-hidden animate-pulse"
                     >
                         <div className="aspect-[2/1] bg-gray-200 dark:bg-gray-700" />
                         <div className="p-4 space-y-2">

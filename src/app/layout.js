@@ -1,34 +1,29 @@
-import { Inter, JetBrains_Mono } from "next/font/google";
-import "./globals.css";
+import { IBM_Plex_Mono } from 'next/font/google';
+import { TooltipProvider } from '@twelvelabs-io/react';
+import './globals.css';
 
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+const ibmPlexMono = IBM_Plex_Mono({
+    variable: '--font-tl-mono-loaded',
+    subsets: ['latin'],
+    weight: ['400', '500'],
 });
 
 export const metadata = {
-  title: "TwelveLabs — Automated Video Data Labeler",
-  description:
-    "AI-powered video understanding and automated data labeling dashboard",
-  icons: {
-    icon: "/favicon.ico",
-  },
+    title: 'TwelveLabs — Automated Video Data Labeler',
+    description:
+        'AI-powered video understanding and automated data labeling dashboard',
+    icons: {
+        icon: '/favicon.ico',
+    },
 };
 
 export default function RootLayout({ children }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+    return (
+        <html lang="en" suppressHydrationWarning className={ibmPlexMono.variable}>
+            <head>
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `
               (function() {
                 try {
                   var theme = localStorage.getItem('theme');
@@ -38,14 +33,17 @@ export default function RootLayout({ children }) {
                 } catch(e) {}
               })();
             `,
-          }}
-        />
-      </head>
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-      >
-        {children}
-      </body>
-    </html>
-  );
+                    }}
+                />
+                <style
+                    dangerouslySetInnerHTML={{
+                        __html: `:root { --tl-font-family-mono: var(--font-tl-mono-loaded), "IBM Plex Mono", ui-monospace, monospace; }`,
+                    }}
+                />
+            </head>
+            <body className="min-h-screen bg-surface-body font-tl-sans text-foreground-body antialiased">
+                <TooltipProvider>{children}</TooltipProvider>
+            </body>
+        </html>
+    );
 }

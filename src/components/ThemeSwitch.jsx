@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Switch } from '@twelvelabs-io/react';
 
 export default function ThemeSwitch() {
     const [dark, setDark] = useState(false);
@@ -12,28 +12,25 @@ export default function ThemeSwitch() {
         setDark(document.documentElement.classList.contains('dark'));
     }, []);
 
-    const toggle = () => {
-        const next = !dark;
+    const toggle = (next) => {
         setDark(next);
         document.documentElement.classList.toggle('dark', next);
         localStorage.setItem('theme', next ? 'dark' : 'light');
     };
 
     if (!mounted) {
-        return <div className="w-9 h-9" />;
+        return <div className="h-5 w-[4.5rem]" />;
     }
 
     return (
-        <button
-            onClick={toggle}
-            aria-label="Toggle theme"
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-        >
-            {dark ? (
-                <Sun className="w-5 h-5 text-secondary-400" />
-            ) : (
-                <Moon className="w-5 h-5 text-gray-500" />
-            )}
-        </button>
+        <label className="flex cursor-pointer items-center gap-2 select-none">
+            <span className="text-xs text-foreground-subtle">{dark ? 'Dark' : 'Light'}</span>
+            <Switch
+                size="sm"
+                checked={dark}
+                onCheckedChange={toggle}
+                aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            />
+        </label>
     );
 }
